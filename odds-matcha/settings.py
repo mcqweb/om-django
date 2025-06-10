@@ -14,9 +14,9 @@ DATABASES = {
 }
 
 # Security settings
-SECRET_KEY = 'your_secret_key'
-DEBUG = True
-ALLOWED_HOSTS = []
+SECRET_KEY = 'ChickenTikkaMasalaIsTheBestFoodInTheWorld'
+DEBUG = False
+ALLOWED_HOSTS = ['localhost', '127.0.0.1','oddsmatcha.uk']
 NPM_BIN_PATH = "C:/Program Files/nodejs/npm.cmd"
 # Installed apps
 INSTALLED_APPS = [
@@ -124,5 +124,7 @@ USE_TZ = True
 
 # Static files (CSS, JavaScript, Images)
 STATIC_URL = '/static/'
+STATICFILES_DIRS = [BASE_DIR / "static"]
+STATIC_ROOT = BASE_DIR / "staticfiles"
 
 LOGIN_REDIRECT_URL = '/'
