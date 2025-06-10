@@ -1,5 +1,10 @@
+import uuid
 from django.db import models
+from django.conf import settings
 from django.contrib.auth.models import User
+from django.db.models.signals import post_save
+from django.dispatch import receiver
+from .supabase_admin import create_supabase_user
 
 class Tool(models.Model):
     name = models.CharField(max_length=100, unique=True)
@@ -39,3 +44,22 @@ class TwoUp(models.Model):
     class Meta:
         db_table = 'betting_data"."two_up'  # schema"."table for PostgreSQL
         managed = False  # Don't let Django create/drop this table
+
+class Profile(models.Model):
+    user = models.OneToOneField(User, on_delete=models.CASCADE)
+    supabase_uid = models.UUIDField(null=True, blank=True, unique=True, verbose_name="Supabase UID")
+
+    def __str__(self):
+        return f"Profile for {self.user.username}"
+
+    class Meta:
+        managed = True  # This is the default, but explicit is fine
+
+@receiver(post_save, sender=User)
+def create_user_profile(sender, instance, created, **kwargs):
+    if created:
+        profile = Profile.objects.create(user=instance)
+        # Create Supabase user and store UUID
+        supabase_uid = create_supabase_user(instance.email, instance.password)
+        profile.supabase_uid = supabase_uid
+        profile.save()

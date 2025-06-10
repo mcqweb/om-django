@@ -1,7 +1,13 @@
-from django.shortcuts import render
+from django.contrib.auth.models import User
+from django.shortcuts import render, redirect
 from django.contrib.auth.decorators import login_required, permission_required
 from .models import UserToolPermission, TwoUp, Event
 from collections import defaultdict
+from django.utils import timezone
+from tools.utils import generate_supabase_jwt
+from django.conf import settings
+from .supabase_admin import create_supabase_user
+from django.db import transaction
 
 def landing(request):
     tools = []
@@ -13,10 +19,30 @@ def landing(request):
 
 @login_required
 def two_ups(request):
-    data = TwoUp.objects.all()
+    now = timezone.now()
+    # Get all events in the future
+    future_events = Event.objects.filter(event_date__gte=now)
+    event_ids = [e.id for e in future_events]
+    # Only get TwoUp rows for future events
+    data = TwoUp.objects.filter(event_id__in=event_ids).order_by('event_id', 'participant_name')
     # Build a mapping of event_id to event object
-    events = {e.id: e for e in Event.objects.filter(id__in=[d.event_id for d in data])}
-    return render(request, "tools/two_ups.html", {"data": data, "events": events})
+    events = {e.id: e for e in future_events}
+    # Group rows by event_id
+    grouped = defaultdict(list)
+    for row in data:
+        grouped[row.event_id].append(row)
+    # Sort events by event_date
+    sorted_events = sorted(events.values(), key=lambda e: e.event_date)
+    jwt_token = generate_supabase_jwt(request.user)
+    context = {
+        "grouped": grouped,
+        "events": events,
+        "sorted_events": sorted_events,
+        "SUPABASE_URL": settings.SUPABASE_URL,
+        "SUPABASE_ANON_KEY": settings.SUPABASE_ANON_KEY,
+        "SUPABASE_JWT": jwt_token,
+    }
+    return render(request, "tools/two_ups.html", context)
 
 @login_required
 def racing_matcher(request):
@@ -25,3 +51,21 @@ def racing_matcher(request):
 @login_required
 def willhillbb(request):
     return render(request, "tools/willhillbb.html")
+
+def register_user(request):
+    if request.method == "POST":
+        username = request.POST["username"]
+        email = request.POST["email"]
+        password = request.POST["password"]
+        try:
+            with transaction.atomic():
+                # Create Django user
+                user = User.objects.create_user(username=username, email=email, password=password)
+                # Create Supabase user and store UUID
+                supabase_uid = create_supabase_user(email, password)
+                user.supabase_uid = supabase_uid
+                user.save()
+            return redirect("login")
+        except Exception as e:
+            return render(request, "register.html", {"error": str(e)})
+    return render(request, "register.html")

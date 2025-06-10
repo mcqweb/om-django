@@ -23,14 +23,16 @@ INSTALLED_APPS = [
     'django.contrib.messages',
     'django.contrib.staticfiles',
     'django.contrib.sites',
+    'django_extensions',
+    'tools',
+    'tailwind',
+    'theme',
     'allauth',
     'allauth.account',
     'allauth.socialaccount',
     'allauth.socialaccount.providers.discord',
-    'tools',
-    'tailwind',
-    'theme'
 ]
+
 TAILWIND_APP_NAME = 'theme'
 TAILWIND_CSS_ARGUMENTS = [
     '--output', 'theme/static/css/dist/styles.css'
@@ -52,8 +54,24 @@ AUTHENTICATION_BACKENDS = [
     'allauth.account.auth_backends.AuthenticationBackend',
 ]
 
+SITE_ID = 1  # or your actual site ID
+
+SOCIALACCOUNT_PROVIDERS = {
+    "discord": {
+        "SCOPE": [
+            "identify",
+            "email"
+        ]
+    }
+}
+
 # URL configuration
 ROOT_URLCONF = 'odds-matcha.urls'
+
+SUPABASE_JWT_SECRET = 'H3fncEtvTlJUfByii+juyPC2QpU4sp05aXcSdoQLeGih/3iwjK5jKKOI/R66Y9fEi7/SHgWm38NDM1m3GAv17Q=='
+SUPABASE_URL = "https://boywtnsbssunyyyasxud.supabase.co"
+SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJveXd0bnNic3N1bnl5eWFzeHVkIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDc5ODY0NDQsImV4cCI6MjA2MzU2MjQ0NH0.ewgUMeJ8zLpnt6yJKoOWEFpn-RiipNwBqZTuuExTwcU"
+SUPABASE_SERVICE_ROLE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJveXd0bnNic3N1bnl5eWFzeHVkIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc0Nzk4NjQ0NCwiZXhwIjoyMDYzNTYyNDQ0fQ.3mvEm5CMpbQyXuA7oB4NKXvksQVwzsjFLjNg3yzXUoM"
 
 # Templates
 TEMPLATES = [
@@ -101,3 +119,5 @@ USE_TZ = True
 
 # Static files (CSS, JavaScript, Images)
 STATIC_URL = '/static/'
+
+LOGIN_REDIRECT_URL = '/'

@@ -1,42 +1,226 @@
 {% extends "base.html" %}
-{% load tools_extras %}
 {% block content %}
 <h1 class="text-2xl font-bold mb-4">2Ups Tool</h1>
-
-<div class="overflow-x-auto">
-<table class="min-w-full bg-white shadow rounded-lg">
-    <thead>
-        <tr class="bg-green-100 text-green-900">
-            <th class="px-4 py-2 text-left">Event</th>
-            <th class="px-4 py-2 text-left">Event Date</th>
-            <th class="px-4 py-2 text-left">Market</th>
-            <th class="px-4 py-2 text-left">Participant</th>
-            <th class="px-4 py-2 text-left">Back Bookmaker</th>
-            <th class="px-4 py-2 text-left">Back Odds</th>
-            <th class="px-4 py-2 text-left">Lay Bookmaker</th>
-            <th class="px-4 py-2 text-left">Lay Odds</th>
-        </tr>
-    </thead>
-    <tbody>
-        {% for row in data %}
-        {% with event=events|get_item:row.event_id %}
-        <tr class="hover:bg-green-50 border-b">
-            <td class="px-4 py-2">{{ event.name }}</td>
-            <td class="px-4 py-2">{{ event.event_date|date:"Y-m-d H:i" }}</td>
-            <td class="px-4 py-2">{{ row.market_name }}</td>
-            <td class="px-4 py-2">{{ row.participant_name }}</td>
-            <td class="px-4 py-2">{{ row.back_bookmaker }}</td>
-            <td class="px-4 py-2">{{ row.back_odds }}</td>
-            <td class="px-4 py-2">{{ row.lay_bookmaker }}</td>
-            <td class="px-4 py-2">{{ row.lay_odds }}</td>
-        </tr>
-        {% endwith %}
-        {% empty %}
-        <tr>
-            <td colspan="8" class="text-center py-4">No data available.</td>
-        </tr>
-        {% endfor %}
-    </tbody>
-</table>
+<div id="two-up-data">
+    <div class="text-gray-500">Loading...</div>
 </div>
+<style>
+.highlight {
+    animation: highlight-fade 5s;
+    background-color: #fef08a !important; /* yellow-200 */
+}
+@keyframes highlight-fade {
+    0%   { background-color: #fef08a; }
+    100% { background-color: inherit; }
+}
+</style>
+<script>
+function formatEventDate(dateStr) {
+    const eventDate = new Date(dateStr);
+    const now = new Date();
+    if (eventDate.toDateString() === now.toDateString()) {
+        return eventDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    }
+    const oneWeekFromNow = new Date(now);
+    oneWeekFromNow.setDate(now.getDate() + 7);
+    if (eventDate > now && eventDate < oneWeekFromNow) {
+        return eventDate.toLocaleDateString([], { weekday: 'short', hour: '2-digit', minute: '2-digit' });
+    }
+    return eventDate.toLocaleDateString([], { year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+}
+
+function computeRating(row) {
+    if (!row.back_odds || !row.lay_odds) return '';
+    return ((row.back_odds / row.lay_odds) * 100).toFixed(1);
+}
+
+function groupByEvent(data) {
+    const groups = {};
+    data.forEach(row => {
+        const key = `${row.event_name}||${row.event_date}`;
+        if (!groups[key]) groups[key] = [];
+        groups[key].push(row);
+    });
+    return groups;
+}
+
+async function fetchAndRenderTwoUp() {
+    document.getElementById('two-up-data').innerHTML = `<div class="text-gray-500">Loading...</div>`;
+    const { data, error } = await supabase
+        .schema("betting_data")
+        .from('two_up')
+        .select('id,event_name,event_date,participant_name,back_bookmaker,back_odds,lay_bookmaker,lay_odds');
+    if (error) {
+        document.getElementById('two-up-data').innerHTML = `<p class="text-red-600">Failed to load data: ${error.message}</p>`;
+        return;
+    }
+    twoUpRows = data;
+    renderTwoUp(twoUpRows);
+}
+
+function renderTwoUp(data, highlightRowId=null) {
+    const groups = groupByEvent(data);
+    const sortedGroups = Object.entries(groups).sort(
+        ([aKey], [bKey]) => new Date(aKey.split('||')[1]) - new Date(bKey.split('||')[1])
+    );
+    let html = '<div class="overflow-x-auto"><table class="min-w-full text-sm border border-gray-300 rounded-lg shadow">';
+    sortedGroups.forEach(([key, rows], eventIdx) => {
+        const [event_name, event_date] = key.split('||');
+        const eventTbodyId = `event-tbody-${eventIdx}`;
+        html += `
+            <tbody>
+                <tr class="bg-blue-100 cursor-pointer" onclick="toggleEvent('${eventTbodyId}')">
+                    <td colspan="6" class="font-bold px-4 py-3 text-lg border-b border-blue-300">
+                        <span id="icon-${eventTbodyId}">–</span>
+                        ${event_name} <span class="text-gray-500 text-base">(${formatEventDate(event_date)})</span>
+                    </td>
+                </tr>
+            </tbody>
+            <tbody id="${eventTbodyId}">
+                <tr class="bg-gray-200">
+                    <th class="px-4 py-2 text-left border-b">Participant</th>
+                    <th class="px-4 py-2 text-left border-b">Back Bookmaker</th>
+                    <th class="px-4 py-2 text-left border-b">Back Odds</th>
+                    <th class="px-4 py-2 text-left border-b">Lay Bookmaker</th>
+                    <th class="px-4 py-2 text-left border-b">Lay Odds</th>
+                    <th class="px-4 py-2 text-left border-b">Rating</th>
+                </tr>
+        `;
+
+        // Group by participant
+        const participantGroups = {};
+        rows.forEach(row => {
+            if (!participantGroups[row.participant_name]) participantGroups[row.participant_name] = [];
+            participantGroups[row.participant_name].push(row);
+        });
+
+        Object.entries(participantGroups).forEach(([participant, group], pIdx) => {
+            // Sort by lay_odds ascending (lowest first)
+            const sorted = group.sort((a, b) => a.lay_odds - b.lay_odds);
+            const mainRow = sorted[0];
+            const extraRows = sorted.slice(1);
+            const partTbodyId = `event-${eventIdx}-part-${pIdx}`;
+
+            html += `
+                <tr data-row-id="${mainRow.id}" class="${highlightRowId === mainRow.id ? 'highlight' : ''}">
+                    <td class="px-4 py-2 font-medium flex items-center">
+                        ${extraRows.length > 0 ? `
+                            <button onclick="toggleParticipant(event, '${partTbodyId}')" class="mr-2 text-xs bg-gray-300 px-2 py-1 rounded flex items-center">
+                                <span id="icon-${partTbodyId}">+</span>
+                            </button>
+                        ` : ''}
+                        <span>${participant}</span>
+                    </td>
+                    <td class="px-4 py-2">${mainRow.back_bookmaker}</td>
+                    <td class="px-4 py-2">${mainRow.back_odds}</td>
+                    <td class="px-4 py-2">${mainRow.lay_bookmaker}</td>
+                    <td class="px-4 py-2">${mainRow.lay_odds}</td>
+                    <td class="px-4 py-2 font-semibold text-right">${computeRating(mainRow)}%</td>
+                </tr>
+            `;
+
+            if (extraRows.length > 0) {
+                extraRows.forEach(row => {
+                    html += `
+                        <tr data-row-id="${row.id}" class="${highlightRowId === row.id ? 'highlight' : ''}" class="bg-gray-50" data-participant="${partTbodyId}" style="display:none;">
+                            <td class="px-4 py-2 font-medium"></td>
+                            <td class="px-4 py-2">${row.back_bookmaker}</td>
+                            <td class="px-4 py-2">${row.back_odds}</td>
+                            <td class="px-4 py-2">${row.lay_bookmaker}</td>
+                            <td class="px-4 py-2">${row.lay_odds}</td>
+                            <td class="px-4 py-2 font-semibold text-right">${computeRating(row)}%</td>
+                        </tr>
+                    `;
+                });
+            }
+        });
+
+        html += '</tbody>';
+    });
+    html += '</table></div>';
+    document.getElementById('two-up-data').innerHTML = html;
+
+    // Remove highlight after 5 seconds
+    if (highlightRowId) {
+        setTimeout(() => {
+            const el = document.querySelector(`tr[data-row-id="${highlightRowId}"]`);
+            if (el) el.classList.remove('highlight');
+        }, 5000);
+    }
+}
+
+function toggleEvent(tbodyId) {
+    const tbody = document.getElementById(tbodyId);
+    const icon = document.getElementById(`icon-${tbodyId}`);
+    if (tbody.style.display === "none") {
+        tbody.style.display = "";
+        if (icon) icon.textContent = "–";
+    } else {
+        tbody.style.display = "none";
+        if (icon) icon.textContent = "+";
+    }
+}
+
+function toggleParticipant(event, partTbodyId) {
+    event.stopPropagation();
+    const rows = document.querySelectorAll(`tr[data-participant="${partTbodyId}"]`);
+    const icon = document.getElementById(`icon-${partTbodyId}`);
+    // If ANY row is hidden, we want to show all; otherwise, hide all
+    let anyHidden = Array.from(rows).some(row => row.style.display === "none" || row.hidden);
+    rows.forEach(row => {
+        row.style.display = anyHidden ? "" : "none";
+    });
+    if (icon) icon.textContent = anyHidden ? "–" : "+";
+}
+
+function handleRealtimeChange(payload) {
+    const { eventType, new: newRow, old: oldRow } = payload;
+    let highlightId = null;
+    if (eventType === "INSERT") {
+        twoUpRows.push(newRow);
+        highlightId = newRow.id;
+    } else if (eventType === "UPDATE") {
+        twoUpRows = twoUpRows.map(row => row.id === newRow.id ? newRow : row);
+        highlightId = newRow.id;
+    } else if (eventType === "DELETE") {
+        twoUpRows = twoUpRows.filter(row => row.id !== oldRow.id);
+    }
+    renderTwoUp(twoUpRows, highlightId);
+}
+
+function parseJwt(token) {
+    try {
+        return JSON.parse(atob(token.split('.')[1]));
+    } catch (e) {
+        return null;
+    }
+}
+
+console.log("Supabase JWT:", "{{ SUPABASE_JWT }}");
+const decodedJwt = parseJwt("{{ SUPABASE_JWT }}");
+console.log("Decoded JWT:", decodedJwt);
+
+let twoUpRows = [];
+
+(async function() {
+    const ok = await signInWithJwt();
+    if (ok) {
+        fetchAndRenderTwoUp();
+        console.log("Subscribing to two_up realtime changes...");
+        await supabase
+            .channel('two_up_changes')
+            .on(
+                'postgres_changes',
+                { event: '*', schema: 'betting_data', table: 'two_up' },
+                payload => {
+                    console.log("Realtime payload:", payload);
+                    handleRealtimeChange(payload);
+                }
+            )
+            .subscribe();
+    } else {
+        document.getElementById('two-up-data').innerHTML = `<p class="text-red-600">Authentication failed. Cannot load data.</p>`;
+    }
+})();
+</script>
 {% endblock %}
