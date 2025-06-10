@@ -1,3 +1,7 @@
+from pathlib import Path
+
+BASE_DIR = Path(__file__).resolve().parent.parent
+
 DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.postgresql',
@@ -64,6 +68,7 @@ SOCIALACCOUNT_PROVIDERS = {
         ]
     }
 }
+SOCIALACCOUNT_LOGIN_ON_GET = True
 
 # URL configuration
 ROOT_URLCONF = 'odds-matcha.urls'
@@ -77,7 +82,7 @@ SUPABASE_SERVICE_ROLE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdX
 TEMPLATES = [
     {
         'BACKEND': 'django.template.backends.django.DjangoTemplates',
-        'DIRS': [],
+        'DIRS': [BASE_DIR / "theme" / "templates"],
         'APP_DIRS': True,
         'OPTIONS': {
             'context_processors': [
