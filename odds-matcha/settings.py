@@ -15,7 +15,7 @@ DATABASES = {
 
 # Security settings
 SECRET_KEY = 'ChickenTikkaMasalaIsTheBestFoodInTheWorld'
-DEBUG = False
+DEBUG = True
 ALLOWED_HOSTS = ['localhost', '127.0.0.1','oddsmatcha.uk']
 NPM_BIN_PATH = "C:/Program Files/nodejs/npm.cmd"
 # Installed apps

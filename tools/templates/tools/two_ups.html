@@ -63,28 +63,25 @@ function renderTwoUp(data, highlightRowId=null) {
     const sortedGroups = Object.entries(groups).sort(
         ([aKey], [bKey]) => new Date(aKey.split('||')[1]) - new Date(bKey.split('||')[1])
     );
-    let html = '<div class="overflow-x-auto"><table class="min-w-full text-sm border border-gray-300 rounded-lg shadow">';
+    let html = `
+<div class="overflow-x-auto">
+  <table class="min-w-full text-sm bg-white border border-gray-300 rounded-lg shadow">
+    <tbody>
+`;
     sortedGroups.forEach(([key, rows], eventIdx) => {
         const [event_name, event_date] = key.split('||');
         const eventTbodyId = `event-tbody-${eventIdx}`;
         html += `
             <tbody>
-                <tr class="bg-blue-100 cursor-pointer" onclick="toggleEvent('${eventTbodyId}')">
-                    <td colspan="6" class="font-bold px-4 py-3 text-lg border-b border-blue-300">
-                        <span id="icon-${eventTbodyId}">–</span>
-                        ${event_name} <span class="text-gray-500 text-base">(${formatEventDate(event_date)})</span>
+                <tr class="bg-blue-600 text-white cursor-pointer" onclick="toggleEvent('${eventTbodyId}')">
+                    <td colspan="6" class="font-bold px-4 py-4 text-lg border-b border-blue-700 rounded-t">
+                        <span id="icon-${eventTbodyId}" class="mr-2">–</span>
+                        <span class="uppercase tracking-wide">${event_name}</span>
+                        <span class="text-blue-200 text-base ml-2">(${formatEventDate(event_date)})</span>
                     </td>
                 </tr>
             </tbody>
             <tbody id="${eventTbodyId}">
-                <tr class="bg-gray-200">
-                    <th class="px-4 py-2 text-left border-b">Participant</th>
-                    <th class="px-4 py-2 text-left border-b">Back Bookmaker</th>
-                    <th class="px-4 py-2 text-left border-b">Back Odds</th>
-                    <th class="px-4 py-2 text-left border-b">Lay Bookmaker</th>
-                    <th class="px-4 py-2 text-left border-b">Lay Odds</th>
-                    <th class="px-4 py-2 text-left border-b">Rating</th>
-                </tr>
         `;
 
         // Group by participant
@@ -102,7 +99,7 @@ function renderTwoUp(data, highlightRowId=null) {
             const partTbodyId = `event-${eventIdx}-part-${pIdx}`;
 
             html += `
-                <tr data-row-id="${mainRow.id}" class="${highlightRowId === mainRow.id ? 'highlight' : ''}">
+                <tr data-row-id="${mainRow.id}" class="${highlightRowId === mainRow.id ? 'highlight' : ''} border-b border-gray-200">
                     <td class="px-4 py-2 font-medium flex items-center">
                         ${extraRows.length > 0 ? `
                             <button onclick="toggleParticipant(event, '${partTbodyId}')" class="mr-2 text-xs bg-gray-300 px-2 py-1 rounded flex items-center">
@@ -122,14 +119,14 @@ function renderTwoUp(data, highlightRowId=null) {
             if (extraRows.length > 0) {
                 extraRows.forEach(row => {
                     html += `
-                        <tr data-row-id="${row.id}" class="${highlightRowId === row.id ? 'highlight' : ''}" class="bg-gray-50" data-participant="${partTbodyId}" style="display:none;">
-                            <td class="px-4 py-2 font-medium"></td>
-                            <td class="px-4 py-2">${row.back_bookmaker}</td>
-                            <td class="px-4 py-2">${row.back_odds}</td>
-                            <td class="px-4 py-2">${row.lay_bookmaker}</td>
-                            <td class="px-4 py-2">${row.lay_odds}</td>
-                            <td class="px-4 py-2 font-semibold text-right">${computeRating(row)}%</td>
-                        </tr>
+                        <tr data-row-id="${row.id}" class="${highlightRowId === row.id ? 'highlight' : ''} border-b border-gray-100 bg-gray-50" data-participant="${partTbodyId}" style="display:none;">
+    <td class="px-4 py-2 font-medium"></td>
+    <td class="px-4 py-2">${row.back_bookmaker}</td>
+    <td class="px-4 py-2">${row.back_odds}</td>
+    <td class="px-4 py-2">${row.lay_bookmaker}</td>
+    <td class="px-4 py-2">${row.lay_odds}</td>
+    <td class="px-4 py-2 font-semibold text-right">${computeRating(row)}%</td>
+</tr>
                     `;
                 });
             }
@@ -137,7 +134,11 @@ function renderTwoUp(data, highlightRowId=null) {
 
         html += '</tbody>';
     });
-    html += '</table></div>';
+    html += `
+    </tbody>
+  </table>
+</div>
+`;
     document.getElementById('two-up-data').innerHTML = html;
 
     // Remove highlight after 5 seconds

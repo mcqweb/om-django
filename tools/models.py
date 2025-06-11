@@ -20,6 +20,9 @@ class UserToolPermission(models.Model):
     class Meta:
         unique_together = ('user', 'tool')
 
+    def __str__(self):
+        return f"{self.user.username} - {self.tool.name}"
+
 class Event(models.Model):
     id = models.UUIDField(primary_key=True)
     name = models.TextField()

@@ -46,7 +46,13 @@ def two_ups(request):
 
 @login_required
 def racing_matcher(request):
-    return render(request, "tools/racing_matcher.html")
+    jwt_token = generate_supabase_jwt(request.user)
+    context = {
+        "SUPABASE_URL": settings.SUPABASE_URL,
+        "SUPABASE_ANON_KEY": settings.SUPABASE_ANON_KEY,
+        "SUPABASE_JWT": jwt_token,
+    }
+    return render(request, "tools/racing_matcher.html",context)
 
 @login_required
 def willhillbb(request):

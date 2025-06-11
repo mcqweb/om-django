@@ -1,0 +1,298 @@
+{% extends "base.html" %}
+{% block content %}
+<h1 class="text-2xl font-bold mb-4">Racing Matcher</h1>
+
+<div class="flex items-center gap-6 mb-4">
+    <label class="flex items-center gap-2 font-semibold">
+        Default Stake:
+        <span class="text-gray-700">£</span>
+        <input id="default-stake" type="number" min="0" step="0.01" value="10" class="border rounded px-2 py-1 w-24">
+    </label>
+    <label class="flex items-center gap-2 font-semibold">
+        <input id="underlay-toggle" type="checkbox" class="accent-blue-600">
+        Underlay
+    </label>
+</div>
+
+<div id="racing-matcher-data">
+    <div class="text-gray-500">Loading...</div>
+</div>
+<style>
+.highlight {
+    animation: highlight-fade 5s;
+    background-color: #fef08a !important;
+}
+@keyframes highlight-fade {
+    0%   { background-color: #fef08a; }
+    100% { background-color: inherit; }
+}
+/* Subtle heading color */
+.racing-header {
+    background-color: #e0e7ef !important;
+    color: #334155 !important;
+}
+/* Subtle alternating row colors */
+.racing-row-even {
+    background-color: #f8fafc;
+}
+.racing-row-odd {
+    background-color: #f1f5f9;
+}
+</style>
+<script>
+function formatEventDate(dateStr) {
+    const eventDate = new Date(dateStr);
+    const now = new Date();
+    if (eventDate.toDateString() === now.toDateString()) {
+        return eventDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    }
+    const oneWeekFromNow = new Date(now);
+    oneWeekFromNow.setDate(now.getDate() + 7);
+    if (eventDate > now && eventDate < oneWeekFromNow) {
+        return eventDate.toLocaleDateString([], { weekday: 'short', hour: '2-digit', minute: '2-digit' });
+    }
+    return eventDate.toLocaleDateString([], { year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+}
+
+function computeRating(row) {
+    if (!row.back_odds || !row.lay_odds) return '';
+    return ((row.back_odds / row.lay_odds) * 100).toFixed(1);
+}
+
+function calculateLayAmount(stake, backOdds, layOdds, underlay) {
+    if (!stake || !backOdds || !layOdds) return '';
+    if (underlay) {
+        return (stake * (backOdds - 1) / (layOdds - 1)).toFixed(2); 
+    } else {
+        return (stake * (backOdds / layOdds)).toFixed(2);
+    }
+}
+
+function groupByEvent(data) {
+    const groups = {};
+    data.forEach(row => {
+        const key = `${row.event_name}||${row.event_date}`;
+        if (!groups[key]) groups[key] = [];
+        groups[key].push(row);
+    });
+    return groups;
+}
+
+// Remember stake and underlay between reloads
+function getRememberedStake() {
+    return localStorage.getItem('defaultStake') || "10";
+}
+function setRememberedStake(val) {
+    localStorage.setItem('defaultStake', val);
+}
+function getRememberedUnderlay() {
+    return localStorage.getItem('underlayToggle') === "true";
+}
+function setRememberedUnderlay(val) {
+    localStorage.setItem('underlayToggle', val ? "true" : "false");
+}
+
+async function fetchAndRenderRacing() {
+    document.getElementById('racing-matcher-data').innerHTML = `<div class="text-gray-500">Loading...</div>`;
+    const { data, error } = await supabase
+        .schema("betting_data")
+        .from('racing')
+        .select('id,event_name,event_date,participant_name,back_bookmaker,back_odds,lay_bookmaker,lay_odds');
+    if (error) {
+        document.getElementById('racing-matcher-data').innerHTML = `<p class="text-red-600">Failed to load data: ${error.message}</p>`;
+        return;
+    }
+    racingRows = data;
+    renderRacing(racingRows);
+}
+
+function renderRacing(data, highlightRowId=null) {
+    const groups = groupByEvent(data);
+    const sortedGroups = Object.entries(groups).sort(
+        ([aKey], [bKey]) => new Date(aKey.split('||')[1]) - new Date(bKey.split('||')[1])
+    );
+    let html = `
+<div class="overflow-x-auto">
+  <table class="min-w-full text-sm bg-white border border-gray-300 rounded-lg shadow">
+    <tbody>
+`;
+    sortedGroups.forEach(([key, rows], eventIdx) => {
+        const [event_name, event_date] = key.split('||');
+        const eventTbodyId = `event-tbody-${eventIdx}`;
+        html += `
+            <tbody>
+                <tr class="racing-header cursor-pointer" onclick="toggleEvent('${eventTbodyId}')">
+                    <td colspan="7" class="font-bold px-4 py-4 text-lg border-b border-blue-100 rounded-t">
+                        <span id="icon-${eventTbodyId}" class="mr-2">–</span>
+                        <span class="uppercase tracking-wide">${event_name}</span>
+                        <span class="text-gray-500 text-base ml-2">(${formatEventDate(event_date)})</span>
+                    </td>
+                </tr>
+            </tbody>
+            <tbody id="${eventTbodyId}">
+        `;
+
+        // Group by participant
+        const participantGroups = {};
+        rows.forEach(row => {
+            if (!participantGroups[row.participant_name]) participantGroups[row.participant_name] = [];
+            participantGroups[row.participant_name].push(row);
+        });
+
+        // 1. Get participant groups as array and compute lay amount for each (using mainRow)
+        const stake = parseFloat(document.getElementById('default-stake').value) || 0;
+        const underlay = document.getElementById('underlay-toggle').checked;
+        let participantGroupArray = Object.entries(participantGroups).map(([participant, group]) => {
+            // Sort each group by rating descending (for extra rows)
+            const sorted = group.slice().sort((a, b) => {
+                const ratingA = a.back_odds && a.lay_odds ? (a.back_odds / a.lay_odds) : 0;
+                const ratingB = b.back_odds && b.lay_odds ? (b.back_odds / b.lay_odds) : 0;
+                return ratingB - ratingA;
+            });
+            // Compute lay amount for the group (use mainRow)
+            const mainRow = sorted[0];
+            const layAmount = mainRow ? parseFloat(calculateLayAmount(stake, mainRow.back_odds, mainRow.lay_odds, underlay)) : 0;
+            return { participant, sorted, layAmount };
+        });
+
+        // 2. Sort participant groups by layAmount descending
+        participantGroupArray.sort((a, b) => b.layAmount - a.layAmount);
+
+        // 3. Render as before, but add Lay Amount column and alternate row colors
+        participantGroupArray.forEach(({ participant, sorted }, pIdx) => {
+            const mainRow = sorted[0];
+            const extraRows = sorted.slice(1);
+            const partTbodyId = `event-${eventIdx}-part-${pIdx}`;
+            const rowClass = pIdx % 2 === 0 ? 'racing-row-even' : 'racing-row-odd';
+
+            html += `
+                <tr data-row-id="${mainRow.id}" class="${rowClass} ${highlightRowId === mainRow.id ? 'highlight' : ''} border-b border-gray-200">
+                    <td class="px-4 py-2 font-medium flex items-center">
+                        ${extraRows.length > 0 ? `
+                            <button onclick="toggleParticipant(event, '${partTbodyId}')" class="mr-2 text-xs bg-gray-300 px-2 py-1 rounded flex items-center">
+                                <span id="icon-${partTbodyId}">+</span>
+                            </button>
+                        ` : ''}
+                        <span>${participant}</span>
+                    </td>
+                    <td class="px-4 py-2">${mainRow.back_bookmaker}</td>
+                    <td class="px-4 py-2">${mainRow.back_odds}</td>
+                    <td class="px-4 py-2">${mainRow.lay_bookmaker}</td>
+                    <td class="px-4 py-2">${mainRow.lay_odds}</td>
+                    <td class="px-4 py-2 font-semibold text-right">${computeRating(mainRow)}%</td>
+                    <td class="px-4 py-2">£${calculateLayAmount(stake, mainRow.back_odds, mainRow.lay_odds, underlay)}</td>
+                </tr>
+            `;
+
+            if (extraRows.length > 0) {
+                extraRows.forEach((row, idx) => {
+                    const extraRowClass = (pIdx % 2 === 0 ? 'racing-row-even' : 'racing-row-odd') + ' bg-gray-50';
+                    html += `
+                        <tr data-row-id="${row.id}" class="${extraRowClass} ${highlightRowId === row.id ? 'highlight' : ''} border-b border-gray-100" data-participant="${partTbodyId}" style="display:none;">
+<td class="px-4 py-2 font-medium"></td>
+<td class="px-4 py-2">${row.back_bookmaker}</td>
+<td class="px-4 py-2">${row.back_odds}</td>
+<td class="px-4 py-2">${row.lay_bookmaker}</td>
+<td class="px-4 py-2">${row.lay_odds}</td>
+<td class="px-4 py-2 font-semibold text-right">${computeRating(row)}%</td>
+<td class="px-4 py-2">£${calculateLayAmount(stake, row.back_odds, row.lay_odds, underlay)}</td>
+</tr>
+                    `;
+                });
+            }
+        });
+        html += '</tbody>';
+    });
+    html += `
+    </tbody>
+  </table>
+</div>
+`;
+    document.getElementById('racing-matcher-data').innerHTML = html;
+
+    // Remove highlight after 5 seconds
+    if (highlightRowId) {
+        setTimeout(() => {
+            const el = document.querySelector(`tr[data-row-id="${highlightRowId}"]`);
+            if (el) el.classList.remove('highlight');
+        }, 5000);
+    }
+}
+
+function toggleEvent(tbodyId) {
+    const tbody = document.getElementById(tbodyId);
+    const icon = document.getElementById(`icon-${tbodyId}`);
+    if (tbody.style.display === "none") {
+        tbody.style.display = "";
+        if (icon) icon.textContent = "–";
+    } else {
+        tbody.style.display = "none";
+        if (icon) icon.textContent = "+";
+    }
+}
+
+function toggleParticipant(event, partTbodyId) {
+    event.stopPropagation();
+    const rows = document.querySelectorAll(`tr[data-participant="${partTbodyId}"]`);
+    const icon = document.getElementById(`icon-${partTbodyId}`);
+    let anyHidden = Array.from(rows).some(row => row.style.display === "none" || row.hidden);
+    rows.forEach(row => {
+        row.style.display = anyHidden ? "" : "none";
+    });
+    if (icon) icon.textContent = anyHidden ? "–" : "+";
+}
+
+function handleRealtimeChange(payload) {
+    const { eventType, new: newRow, old: oldRow } = payload;
+    let highlightId = null;
+    if (eventType === "INSERT") {
+        racingRows.push(newRow);
+        highlightId = newRow.id;
+    } else if (eventType === "UPDATE") {
+        racingRows = racingRows.map(row => row.id === newRow.id ? newRow : row);
+        highlightId = newRow.id;
+    } else if (eventType === "DELETE") {
+        racingRows = racingRows.filter(row => row.id !== oldRow.id);
+    }
+    renderRacing(racingRows, highlightId);
+}
+
+let racingRows = [];
+
+(async function() {
+    const ok = await signInWithJwt();
+    if (ok) {
+        fetchAndRenderRacing();
+        console.log("Subscribing to racing realtime changes...");
+        await supabase
+            .channel('racing_changes')
+            .on(
+                'postgres_changes',
+                { event: '*', schema: 'betting_data', table: 'racing' },
+                payload => {
+                    console.log("Realtime payload:", payload);
+                    handleRealtimeChange(payload);
+                }
+            )
+            .subscribe();
+    } else {
+        document.getElementById('racing-matcher-data').innerHTML = `<p class="text-red-600">Authentication failed. Cannot load data.</p>`;
+    }
+})();
+
+document.addEventListener('DOMContentLoaded', function() {
+    // Set remembered stake and underlay on load
+    document.getElementById('default-stake').value = getRememberedStake();
+    document.getElementById('underlay-toggle').checked = getRememberedUnderlay();
+
+    document.getElementById('default-stake').addEventListener('input', function() {
+        setRememberedStake(this.value);
+        renderRacing(racingRows);
+    });
+    document.getElementById('underlay-toggle').addEventListener('change', function() {
+        setRememberedUnderlay(this.checked);
+        renderRacing(racingRows);
+    });
+});
+</script>
+{% endblock %}
