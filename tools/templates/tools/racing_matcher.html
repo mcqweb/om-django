@@ -6,11 +6,19 @@
     <label class="flex items-center gap-2 font-semibold">
         Default Stake:
         <span class="text-gray-700">£</span>
-        <input id="default-stake" type="number" min="0" step="0.01" value="10" class="border rounded px-2 py-1 w-24">
+        <input id="default-stake" type="number" min="0" step="0.01" value="10" class="border rounded px-1 py-0.5 w-14 text-sm">
+    </label>
+    <label class="inline-flex items-center cursor-pointer font-semibold">
+      <input id="underlay-toggle" type="checkbox" class="sr-only peer">
+      <div class="relative w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-blue-300 rounded-full peer-checked:bg-blue-600 transition-colors
+        after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all
+        peer-checked:after:translate-x-full peer-checked:after:border-white"></div>
+      <span class="ms-2 text-sm text-gray-900">Underlay</span>
     </label>
     <label class="flex items-center gap-2 font-semibold">
-        <input id="underlay-toggle" type="checkbox" class="accent-blue-600">
-        Underlay
+        Min QL:
+        <span class="text-gray-700">£</span>
+        <input id="min-ql" type="number" min="0" step="0.01" value="0" class="border rounded px-1 py-0.5 w-14 text-sm">
     </label>
 </div>
 
@@ -92,6 +100,14 @@ function setRememberedUnderlay(val) {
     localStorage.setItem('underlayToggle', val ? "true" : "false");
 }
 
+// Remember min QL between reloads
+function getRememberedMinQl() {
+    return localStorage.getItem('minQl') || "0";
+}
+function setRememberedMinQl(val) {
+    localStorage.setItem('minQl', val);
+}
+
 async function fetchAndRenderRacing() {
     document.getElementById('racing-matcher-data').innerHTML = `<div class="text-gray-500">Loading...</div>`;
     const { data, error } = await supabase
@@ -116,21 +132,10 @@ function renderRacing(data, highlightRowId=null) {
   <table class="min-w-full text-sm bg-white border border-gray-300 rounded-lg shadow">
     <tbody>
 `;
+    const minQl = parseFloat(document.getElementById('min-ql').value) || 0;
+
     sortedGroups.forEach(([key, rows], eventIdx) => {
         const [event_name, event_date] = key.split('||');
-        const eventTbodyId = `event-tbody-${eventIdx}`;
-        html += `
-            <tbody>
-                <tr class="racing-header cursor-pointer" onclick="toggleEvent('${eventTbodyId}')">
-                    <td colspan="7" class="font-bold px-4 py-4 text-lg border-b border-blue-100 rounded-t">
-                        <span id="icon-${eventTbodyId}" class="mr-2">–</span>
-                        <span class="uppercase tracking-wide">${event_name}</span>
-                        <span class="text-gray-500 text-base ml-2">(${formatEventDate(event_date)})</span>
-                    </td>
-                </tr>
-            </tbody>
-            <tbody id="${eventTbodyId}">
-        `;
 
         // Group by participant
         const participantGroups = {};
@@ -152,13 +157,36 @@ function renderRacing(data, highlightRowId=null) {
             // Compute lay amount for the group (use mainRow)
             const mainRow = sorted[0];
             const layAmount = mainRow ? parseFloat(calculateLayAmount(stake, mainRow.back_odds, mainRow.lay_odds, underlay)) : 0;
-            return { participant, sorted, layAmount };
+            const ql = stake - layAmount;
+            return { participant, sorted, layAmount, ql };
         });
 
-        // 2. Sort participant groups by layAmount descending
+        // 2. Filter by min QL (show QL >= -minQl)
+        participantGroupArray = participantGroupArray.filter(g => g.ql <= minQl);
+
+        // 3. Sort participant groups by layAmount descending
         participantGroupArray.sort((a, b) => b.layAmount - a.layAmount);
 
-        // 3. Render as before, but add Lay Amount column and alternate row colors
+        // Skip this event if no participants remain after filtering
+        if (participantGroupArray.length === 0) {
+            return;
+        }
+
+        // Only render the event header if there are participants left!
+        const eventTbodyId = `event-tbody-${eventIdx}`;
+        html += `
+            <tbody>
+                <tr class="racing-header cursor-pointer" onclick="toggleEvent('${eventTbodyId}')">
+                    <td colspan="7" class="font-bold px-4 py-4 text-lg border-b border-blue-100 rounded-t">
+                        <span id="icon-${eventTbodyId}" class="mr-2">–</span>
+                        <span class="uppercase tracking-wide">${event_name}</span>
+                        <span class="text-gray-500 text-base ml-2">(${formatEventDate(event_date)})</span>
+                    </td>
+                </tr>
+            </tbody>
+            <tbody id="${eventTbodyId}">
+        `;
+
         participantGroupArray.forEach(({ participant, sorted }, pIdx) => {
             const mainRow = sorted[0];
             const extraRows = sorted.slice(1);
@@ -281,16 +309,25 @@ let racingRows = [];
 })();
 
 document.addEventListener('DOMContentLoaded', function() {
-    // Set remembered stake and underlay on load
+    // Set remembered stake and min QL on load
     document.getElementById('default-stake').value = getRememberedStake();
-    document.getElementById('underlay-toggle').checked = getRememberedUnderlay();
+    document.getElementById('min-ql').value = getRememberedMinQl();
+
+    // Underlay toggle setup
+    const underlayToggle = document.getElementById('underlay-toggle');
+    underlayToggle.checked = getRememberedUnderlay();
+
+    underlayToggle.addEventListener('change', function() {
+        setRememberedUnderlay(this.checked);
+        renderRacing(racingRows);
+    });
 
     document.getElementById('default-stake').addEventListener('input', function() {
         setRememberedStake(this.value);
         renderRacing(racingRows);
     });
-    document.getElementById('underlay-toggle').addEventListener('change', function() {
-        setRememberedUnderlay(this.checked);
+    document.getElementById('min-ql').addEventListener('input', function() {
+        setRememberedMinQl(this.value);
         renderRacing(racingRows);
     });
 });

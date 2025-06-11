@@ -15,7 +15,7 @@ DATABASES = {
 
 # Security settings
 SECRET_KEY = 'ChickenTikkaMasalaIsTheBestFoodInTheWorld'
-DEBUG = True
+DEBUG = False
 ALLOWED_HOSTS = ['localhost', '127.0.0.1','oddsmatcha.uk']
 NPM_BIN_PATH = "C:/Program Files/nodejs/npm.cmd"
 # Installed apps
@@ -29,7 +29,7 @@ INSTALLED_APPS = [
     'django.contrib.sites',
     'django_extensions',
     'tools',
-    'tailwind',
+    #'tailwind',
     'theme',
     'allauth',
     'allauth.account',

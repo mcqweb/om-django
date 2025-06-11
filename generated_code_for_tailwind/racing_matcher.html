@@ -1,0 +1,698 @@
+<html lang="en"><head>
+    <title>Odds Matcha</title>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    
+
+<link rel="stylesheet" type="text/css" href="/static/css/dist/styles.css?v=1749633371">
+
+
+
+
+    
+        <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+        <script>
+        const supabase = window.supabase.createClient(
+            "https://boywtnsbssunyyyasxud.supabase.co",
+            "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJveXd0bnNic3N1bnl5eWFzeHVkIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDc5ODY0NDQsImV4cCI6MjA2MzU2MjQ0NH0.ewgUMeJ8zLpnt6yJKoOWEFpn-RiipNwBqZTuuExTwcU"
+        );
+
+        async function signInWithJwt() {
+            const { data, error } = await supabase.auth.setSession({
+                access_token: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiI2NWJhYjhhMi01ODc1LTQ5MjEtOTI4NS04NTc1OWFiMGJmMWQiLCJlbWFpbCI6Im1pY2hhZWwubWNxdWlsbGFuQGdvb2dsZW1haWwuY29tIiwiYXVkIjoiYXV0aGVudGljYXRlZCIsInJvbGUiOiJhdXRoZW50aWNhdGVkIiwiZXhwIjoxNzQ5NjM2OTcxfQ.nZ1PVGH_sjLhW4iCL6pgvFc4Zd2N7W2d9IZNTVGpukY",
+                refresh_token: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiI2NWJhYjhhMi01ODc1LTQ5MjEtOTI4NS04NTc1OWFiMGJmMWQiLCJlbWFpbCI6Im1pY2hhZWwubWNxdWlsbGFuQGdvb2dsZW1haWwuY29tIiwiYXVkIjoiYXV0aGVudGljYXRlZCIsInJvbGUiOiJhdXRoZW50aWNhdGVkIiwiZXhwIjoxNzQ5NjM2OTcxfQ.nZ1PVGH_sjLhW4iCL6pgvFc4Zd2N7W2d9IZNTVGpukY"
+            });
+            if (error) {
+                console.error("Supabase auth error:", error);
+                return false;
+            }
+            return true;
+        }
+
+        signInWithJwt();
+        // Now you can query with RLS enforced for this user!
+        </script>
+    
+</head>
+<body class="bg-gray-50 font-serif leading-normal tracking-normal">
+    <!-- Header -->
+    <header>
+        <div class="max-w-5xl ml-4 bg-gray-900 text-white rounded-lg pl-8 pr-6 py-4 mt-4 shadow flex items-center justify-between">
+            <h1 class="text-2xl font-bold">OddsMatcha</h1>
+            
+            <nav class="flex items-center space-x-4">
+                <a href="/" class="transition underline font-bold text-blue-300">Home</a>
+                <div class="relative group">
+                    <button class="transition px-3 py-1 rounded hover:bg-gray-800 flex items-center focus:outline-none">
+                        Tools
+                        <svg class="ml-1 w-4 h-4 inline" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7"></path>
+                        </svg>
+                    </button>
+                    <div class="absolute left-0 mt-1 -top-1 w-40 bg-white text-gray-900 rounded shadow-lg z-10 hidden group-hover:block group-focus-within:block">
+                        
+                            
+                                <a href="/tools/two_ups" class="block px-4 py-2 transition hover:bg-gray-100">
+                                    2 Ups
+                                </a>
+                            
+                        
+                            
+                                <a href="/tools/racing_matcher" class="block px-4 py-2 transition hover:bg-gray-100">
+                                    Racing Matcher
+                                </a>
+                            
+                        
+                    </div>
+                </div>
+                
+                    <a href="/admin/" class="transition underline font-bold text-blue-300">Admin</a>
+                
+                <a href="/accounts/logout/" class="ml-4 px-3 py-1 rounded bg-red-600 hover:bg-red-700 transition">Logout</a>
+            </nav>
+            <div class="flex items-center gap-2 ml-6">
+                <span>
+                    Logged in as <strong>Quill</strong>
+                </span>
+            </div>
+            
+        </div>
+    </header>
+    <main>
+        <div class="max-w-5xl ml-4 bg-white rounded-lg pl-8 pr-6 py-8 mt-6 shadow">
+            
+<h1 class="text-2xl font-bold mb-4">Racing Matcher</h1>
+
+<div class="flex items-center gap-6 mb-4">
+    <label class="flex items-center gap-2 font-semibold">
+        Default Stake:
+        <span class="text-gray-700">£</span>
+        <input id="default-stake" type="number" min="0" step="0.01" value="10" class="border rounded px-1 py-0.5 w-14 text-sm">
+    </label>
+    <label class="inline-flex items-center cursor-pointer font-semibold">
+      <input id="underlay-toggle" type="checkbox" class="sr-only peer">
+      <div class="relative w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-blue-300 rounded-full peer-checked:bg-blue-600 transition-colors
+        after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all
+        peer-checked:after:translate-x-full peer-checked:after:border-white"></div>
+      <span class="ms-2 text-sm text-gray-900">Underlay</span>
+    </label>
+    <label class="flex items-center gap-2 font-semibold">
+        Min QL:
+        <span class="text-gray-700">£</span>
+        <input id="min-ql" type="number" min="0" step="0.01" value="0" class="border rounded px-1 py-0.5 w-14 text-sm">
+    </label>
+</div>
+
+<div id="racing-matcher-data">
+<div class="overflow-x-auto">
+  <table class="min-w-full text-sm bg-white border border-gray-300 rounded-lg shadow">
+    <tbody>
+
+            </tbody><tbody>
+                <tr class="racing-header cursor-pointer" onclick="toggleEvent('event-tbody-0')">
+                    <td colspan="7" class="font-bold px-4 py-4 text-lg border-b border-blue-100 rounded-t">
+                        <span id="icon-event-tbody-0" class="mr-2">–</span>
+                        <span class="uppercase tracking-wide">Kempton: 17:40</span>
+                        <span class="text-gray-500 text-base ml-2">(17:40)</span>
+                    </td>
+                </tr>
+            </tbody>
+            <tbody id="event-tbody-0">
+        
+                <tr data-row-id="2e949c71-4ac4-4c10-85c3-81d89b922ee7" class="racing-row-even  border-b border-gray-200">
+                    <td class="px-4 py-2 font-medium flex items-center">
+                        
+                            <button onclick="toggleParticipant(event, 'event-0-part-0')" class="mr-2 text-xs bg-gray-300 px-2 py-1 rounded flex items-center">
+                                <span id="icon-event-0-part-0">+</span>
+                            </button>
+                        
+                        <span>Moel Arthur</span>
+                    </td>
+                    <td class="px-4 py-2">VirginBet</td>
+                    <td class="px-4 py-2">4.5</td>
+                    <td class="px-4 py-2">Smarkets</td>
+                    <td class="px-4 py-2">4.8</td>
+                    <td class="px-4 py-2 font-semibold text-right">93.8%</td>
+                    <td class="px-4 py-2">£9.38</td>
+                </tr>
+            
+                        <tr data-row-id="8022ba2d-9481-48a9-8af0-49d280673558" class="racing-row-even bg-gray-50  border-b border-gray-100" data-participant="event-0-part-0" style="display:none;">
+<td class="px-4 py-2 font-medium"></td>
+<td class="px-4 py-2">VirginBet</td>
+<td class="px-4 py-2">4.5</td>
+<td class="px-4 py-2">Matchbook</td>
+<td class="px-4 py-2">4.8</td>
+<td class="px-4 py-2 font-semibold text-right">93.8%</td>
+<td class="px-4 py-2">£9.38</td>
+</tr>
+                    </tbody>
+            <tbody>
+                <tr class="racing-header cursor-pointer" onclick="toggleEvent('event-tbody-1')">
+                    <td colspan="7" class="font-bold px-4 py-4 text-lg border-b border-blue-100 rounded-t">
+                        <span id="icon-event-tbody-1" class="mr-2">–</span>
+                        <span class="uppercase tracking-wide">Kempton: 18:10</span>
+                        <span class="text-gray-500 text-base ml-2">(18:10)</span>
+                    </td>
+                </tr>
+            </tbody>
+            <tbody id="event-tbody-1">
+        
+                <tr data-row-id="d5f52852-706d-44c2-8c53-dc47b8f446ac" class="racing-row-even  border-b border-gray-200">
+                    <td class="px-4 py-2 font-medium flex items-center">
+                        
+                            <button onclick="toggleParticipant(event, 'event-1-part-0')" class="mr-2 text-xs bg-gray-300 px-2 py-1 rounded flex items-center">
+                                <span id="icon-event-1-part-0">+</span>
+                            </button>
+                        
+                        <span>Ibshara</span>
+                    </td>
+                    <td class="px-4 py-2">VirginBet</td>
+                    <td class="px-4 py-2">4.35</td>
+                    <td class="px-4 py-2">Matchbook</td>
+                    <td class="px-4 py-2">4.7</td>
+                    <td class="px-4 py-2 font-semibold text-right">92.6%</td>
+                    <td class="px-4 py-2">£9.26</td>
+                </tr>
+            
+                        <tr data-row-id="4238d81e-922f-486d-818c-b0cca3bd2614" class="racing-row-even bg-gray-50  border-b border-gray-100" data-participant="event-1-part-0" style="display:none;">
+<td class="px-4 py-2 font-medium"></td>
+<td class="px-4 py-2">VirginBet</td>
+<td class="px-4 py-2">4.35</td>
+<td class="px-4 py-2">Smarkets</td>
+<td class="px-4 py-2">4.9</td>
+<td class="px-4 py-2 font-semibold text-right">88.8%</td>
+<td class="px-4 py-2">£8.88</td>
+</tr>
+                    
+                <tr data-row-id="263f0d3e-a5ba-4658-93b9-5a581c24d1c0" class="racing-row-odd  border-b border-gray-200">
+                    <td class="px-4 py-2 font-medium flex items-center">
+                        
+                            <button onclick="toggleParticipant(event, 'event-1-part-1')" class="mr-2 text-xs bg-gray-300 px-2 py-1 rounded flex items-center">
+                                <span id="icon-event-1-part-1">+</span>
+                            </button>
+                        
+                        <span>Miss Honey</span>
+                    </td>
+                    <td class="px-4 py-2">VirginBet</td>
+                    <td class="px-4 py-2">1.91</td>
+                    <td class="px-4 py-2">Matchbook</td>
+                    <td class="px-4 py-2">2.08</td>
+                    <td class="px-4 py-2 font-semibold text-right">91.8%</td>
+                    <td class="px-4 py-2">£9.18</td>
+                </tr>
+            
+                        <tr data-row-id="0d7594d4-6dd7-4bb6-aa8f-55c9ad7ac13c" class="racing-row-odd bg-gray-50  border-b border-gray-100" data-participant="event-1-part-1" style="display:none;">
+<td class="px-4 py-2 font-medium"></td>
+<td class="px-4 py-2">VirginBet</td>
+<td class="px-4 py-2">1.91</td>
+<td class="px-4 py-2">Smarkets</td>
+<td class="px-4 py-2">2.1</td>
+<td class="px-4 py-2 font-semibold text-right">91.0%</td>
+<td class="px-4 py-2">£9.10</td>
+</tr>
+                    </tbody>
+            <tbody>
+                <tr class="racing-header cursor-pointer" onclick="toggleEvent('event-tbody-4')">
+                    <td colspan="7" class="font-bold px-4 py-4 text-lg border-b border-blue-100 rounded-t">
+                        <span id="icon-event-tbody-4" class="mr-2">–</span>
+                        <span class="uppercase tracking-wide">Kempton: 19:40</span>
+                        <span class="text-gray-500 text-base ml-2">(19:40)</span>
+                    </td>
+                </tr>
+            </tbody>
+            <tbody id="event-tbody-4">
+        
+                <tr data-row-id="49ffc8a5-46a2-4495-9199-60d472d1b2e0" class="racing-row-even  border-b border-gray-200">
+                    <td class="px-4 py-2 font-medium flex items-center">
+                        
+                            <button onclick="toggleParticipant(event, 'event-4-part-0')" class="mr-2 text-xs bg-gray-300 px-2 py-1 rounded flex items-center">
+                                <span id="icon-event-4-part-0">+</span>
+                            </button>
+                        
+                        <span>Hoodie Hoo</span>
+                    </td>
+                    <td class="px-4 py-2">VirginBet</td>
+                    <td class="px-4 py-2">4</td>
+                    <td class="px-4 py-2">Smarkets</td>
+                    <td class="px-4 py-2">4.4</td>
+                    <td class="px-4 py-2 font-semibold text-right">90.9%</td>
+                    <td class="px-4 py-2">£9.09</td>
+                </tr>
+            
+                        <tr data-row-id="527a711c-7499-4251-9cbc-5911ff468de4" class="racing-row-even bg-gray-50  border-b border-gray-100" data-participant="event-4-part-0" style="display:none;">
+<td class="px-4 py-2 font-medium"></td>
+<td class="px-4 py-2">VirginBet</td>
+<td class="px-4 py-2">4</td>
+<td class="px-4 py-2">Matchbook</td>
+<td class="px-4 py-2">4.6</td>
+<td class="px-4 py-2 font-semibold text-right">87.0%</td>
+<td class="px-4 py-2">£8.70</td>
+</tr>
+                    </tbody>
+            <tbody>
+                <tr class="racing-header cursor-pointer" onclick="toggleEvent('event-tbody-5')">
+                    <td colspan="7" class="font-bold px-4 py-4 text-lg border-b border-blue-100 rounded-t">
+                        <span id="icon-event-tbody-5" class="mr-2">–</span>
+                        <span class="uppercase tracking-wide">Kempton: 20:10</span>
+                        <span class="text-gray-500 text-base ml-2">(20:10)</span>
+                    </td>
+                </tr>
+            </tbody>
+            <tbody id="event-tbody-5">
+        
+                <tr data-row-id="628c716b-43ac-40b4-8044-4489cc956803" class="racing-row-even  border-b border-gray-200">
+                    <td class="px-4 py-2 font-medium flex items-center">
+                        
+                            <button onclick="toggleParticipant(event, 'event-5-part-0')" class="mr-2 text-xs bg-gray-300 px-2 py-1 rounded flex items-center">
+                                <span id="icon-event-5-part-0">+</span>
+                            </button>
+                        
+                        <span>Magic Runner</span>
+                    </td>
+                    <td class="px-4 py-2">VirginBet</td>
+                    <td class="px-4 py-2">6.5</td>
+                    <td class="px-4 py-2">Smarkets</td>
+                    <td class="px-4 py-2">7</td>
+                    <td class="px-4 py-2 font-semibold text-right">92.9%</td>
+                    <td class="px-4 py-2">£9.29</td>
+                </tr>
+            
+                        <tr data-row-id="aebb04ad-b6b7-446c-ace6-ae8da7c9888b" class="racing-row-even bg-gray-50  border-b border-gray-100" data-participant="event-5-part-0" style="display:none;">
+<td class="px-4 py-2 font-medium"></td>
+<td class="px-4 py-2">VirginBet</td>
+<td class="px-4 py-2">6.5</td>
+<td class="px-4 py-2">Matchbook</td>
+<td class="px-4 py-2">7.2</td>
+<td class="px-4 py-2 font-semibold text-right">90.3%</td>
+<td class="px-4 py-2">£9.03</td>
+</tr>
+                    
+                <tr data-row-id="466f810f-1a52-400e-b4e2-c8d74ffb59c3" class="racing-row-odd  border-b border-gray-200">
+                    <td class="px-4 py-2 font-medium flex items-center">
+                        
+                            <button onclick="toggleParticipant(event, 'event-5-part-1')" class="mr-2 text-xs bg-gray-300 px-2 py-1 rounded flex items-center">
+                                <span id="icon-event-5-part-1">+</span>
+                            </button>
+                        
+                        <span>Lady Odette</span>
+                    </td>
+                    <td class="px-4 py-2">VirginBet</td>
+                    <td class="px-4 py-2">8</td>
+                    <td class="px-4 py-2">Smarkets</td>
+                    <td class="px-4 py-2">8.8</td>
+                    <td class="px-4 py-2 font-semibold text-right">90.9%</td>
+                    <td class="px-4 py-2">£9.09</td>
+                </tr>
+            
+                        <tr data-row-id="bf10878c-3baf-45bb-83cb-a62da050423e" class="racing-row-odd bg-gray-50  border-b border-gray-100" data-participant="event-5-part-1" style="display:none;">
+<td class="px-4 py-2 font-medium"></td>
+<td class="px-4 py-2">VirginBet</td>
+<td class="px-4 py-2">8</td>
+<td class="px-4 py-2">Matchbook</td>
+<td class="px-4 py-2">8.8</td>
+<td class="px-4 py-2 font-semibold text-right">90.9%</td>
+<td class="px-4 py-2">£9.09</td>
+</tr>
+                    
+                <tr data-row-id="4094d70f-1bdf-49a1-a31a-472867ae7623" class="racing-row-even  border-b border-gray-200">
+                    <td class="px-4 py-2 font-medium flex items-center">
+                        
+                            <button onclick="toggleParticipant(event, 'event-5-part-2')" class="mr-2 text-xs bg-gray-300 px-2 py-1 rounded flex items-center">
+                                <span id="icon-event-5-part-2">+</span>
+                            </button>
+                        
+                        <span>Phrygia</span>
+                    </td>
+                    <td class="px-4 py-2">VirginBet</td>
+                    <td class="px-4 py-2">4.35</td>
+                    <td class="px-4 py-2">Matchbook</td>
+                    <td class="px-4 py-2">4.8</td>
+                    <td class="px-4 py-2 font-semibold text-right">90.6%</td>
+                    <td class="px-4 py-2">£9.06</td>
+                </tr>
+            
+                        <tr data-row-id="781b7d77-2068-471b-96b6-bbca1a0c937d" class="racing-row-even bg-gray-50  border-b border-gray-100" data-participant="event-5-part-2" style="display:none;">
+<td class="px-4 py-2 font-medium"></td>
+<td class="px-4 py-2">VirginBet</td>
+<td class="px-4 py-2">4.35</td>
+<td class="px-4 py-2">Smarkets</td>
+<td class="px-4 py-2">5</td>
+<td class="px-4 py-2 font-semibold text-right">87.0%</td>
+<td class="px-4 py-2">£8.70</td>
+</tr>
+                    </tbody>
+            <tbody>
+                <tr class="racing-header cursor-pointer" onclick="toggleEvent('event-tbody-6')">
+                    <td colspan="7" class="font-bold px-4 py-4 text-lg border-b border-blue-100 rounded-t">
+                        <span id="icon-event-tbody-6" class="mr-2">–</span>
+                        <span class="uppercase tracking-wide">Kempton: 20:40</span>
+                        <span class="text-gray-500 text-base ml-2">(20:40)</span>
+                    </td>
+                </tr>
+            </tbody>
+            <tbody id="event-tbody-6">
+        
+                <tr data-row-id="9f0a5a3f-d42d-44a6-8876-2bc75af4d4d3" class="racing-row-even  border-b border-gray-200">
+                    <td class="px-4 py-2 font-medium flex items-center">
+                        
+                            <button onclick="toggleParticipant(event, 'event-6-part-0')" class="mr-2 text-xs bg-gray-300 px-2 py-1 rounded flex items-center">
+                                <span id="icon-event-6-part-0">+</span>
+                            </button>
+                        
+                        <span>Sceptic</span>
+                    </td>
+                    <td class="px-4 py-2">VirginBet</td>
+                    <td class="px-4 py-2">8.5</td>
+                    <td class="px-4 py-2">Matchbook</td>
+                    <td class="px-4 py-2">9</td>
+                    <td class="px-4 py-2 font-semibold text-right">94.4%</td>
+                    <td class="px-4 py-2">£9.44</td>
+                </tr>
+            
+                        <tr data-row-id="0c63f1e0-68eb-4c89-b6e6-62f72d0f95bf" class="racing-row-even bg-gray-50  border-b border-gray-100" data-participant="event-6-part-0" style="display:none;">
+<td class="px-4 py-2 font-medium"></td>
+<td class="px-4 py-2">VirginBet</td>
+<td class="px-4 py-2">8.5</td>
+<td class="px-4 py-2">Smarkets</td>
+<td class="px-4 py-2">10</td>
+<td class="px-4 py-2 font-semibold text-right">85.0%</td>
+<td class="px-4 py-2">£8.50</td>
+</tr>
+                    </tbody>
+    
+  </table>
+</div>
+</div>
+<style>
+.highlight {
+    animation: highlight-fade 5s;
+    background-color: #fef08a !important;
+}
+@keyframes highlight-fade {
+    0%   { background-color: #fef08a; }
+    100% { background-color: inherit; }
+}
+/* Subtle heading color */
+.racing-header {
+    background-color: #e0e7ef !important;
+    color: #334155 !important;
+}
+/* Subtle alternating row colors */
+.racing-row-even {
+    background-color: #f8fafc;
+}
+.racing-row-odd {
+    background-color: #f1f5f9;
+}
+</style>
+<script>
+function formatEventDate(dateStr) {
+    const eventDate = new Date(dateStr);
+    const now = new Date();
+    if (eventDate.toDateString() === now.toDateString()) {
+        return eventDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    }
+    const oneWeekFromNow = new Date(now);
+    oneWeekFromNow.setDate(now.getDate() + 7);
+    if (eventDate > now && eventDate < oneWeekFromNow) {
+        return eventDate.toLocaleDateString([], { weekday: 'short', hour: '2-digit', minute: '2-digit' });
+    }
+    return eventDate.toLocaleDateString([], { year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+}
+
+function computeRating(row) {
+    if (!row.back_odds || !row.lay_odds) return '';
+    return ((row.back_odds / row.lay_odds) * 100).toFixed(1);
+}
+
+function calculateLayAmount(stake, backOdds, layOdds, underlay) {
+    if (!stake || !backOdds || !layOdds) return '';
+    if (underlay) {
+        return (stake * (backOdds - 1) / (layOdds - 1)).toFixed(2); 
+    } else {
+        return (stake * (backOdds / layOdds)).toFixed(2);
+    }
+}
+
+function groupByEvent(data) {
+    const groups = {};
+    data.forEach(row => {
+        const key = `${row.event_name}||${row.event_date}`;
+        if (!groups[key]) groups[key] = [];
+        groups[key].push(row);
+    });
+    return groups;
+}
+
+// Remember stake and underlay between reloads
+function getRememberedStake() {
+    return localStorage.getItem('defaultStake') || "10";
+}
+function setRememberedStake(val) {
+    localStorage.setItem('defaultStake', val);
+}
+function getRememberedUnderlay() {
+    return localStorage.getItem('underlayToggle') === "true";
+}
+function setRememberedUnderlay(val) {
+    localStorage.setItem('underlayToggle', val ? "true" : "false");
+}
+
+// Remember min QL between reloads
+function getRememberedMinQl() {
+    return localStorage.getItem('minQl') || "0";
+}
+function setRememberedMinQl(val) {
+    localStorage.setItem('minQl', val);
+}
+
+async function fetchAndRenderRacing() {
+    document.getElementById('racing-matcher-data').innerHTML = `<div class="text-gray-500">Loading...</div>`;
+    const { data, error } = await supabase
+        .schema("betting_data")
+        .from('racing')
+        .select('id,event_name,event_date,participant_name,back_bookmaker,back_odds,lay_bookmaker,lay_odds');
+    if (error) {
+        document.getElementById('racing-matcher-data').innerHTML = `<p class="text-red-600">Failed to load data: ${error.message}</p>`;
+        return;
+    }
+    racingRows = data;
+    renderRacing(racingRows);
+}
+
+function renderRacing(data, highlightRowId=null) {
+    const groups = groupByEvent(data);
+    const sortedGroups = Object.entries(groups).sort(
+        ([aKey], [bKey]) => new Date(aKey.split('||')[1]) - new Date(bKey.split('||')[1])
+    );
+    let html = `
+<div class="overflow-x-auto">
+  <table class="min-w-full text-sm bg-white border border-gray-300 rounded-lg shadow">
+    <tbody>
+`;
+    const minQl = parseFloat(document.getElementById('min-ql').value) || 0;
+
+    sortedGroups.forEach(([key, rows], eventIdx) => {
+        const [event_name, event_date] = key.split('||');
+
+        // Group by participant
+        const participantGroups = {};
+        rows.forEach(row => {
+            if (!participantGroups[row.participant_name]) participantGroups[row.participant_name] = [];
+            participantGroups[row.participant_name].push(row);
+        });
+
+        // 1. Get participant groups as array and compute lay amount for each (using mainRow)
+        const stake = parseFloat(document.getElementById('default-stake').value) || 0;
+        const underlay = document.getElementById('underlay-toggle').checked;
+        let participantGroupArray = Object.entries(participantGroups).map(([participant, group]) => {
+            // Sort each group by rating descending (for extra rows)
+            const sorted = group.slice().sort((a, b) => {
+                const ratingA = a.back_odds && a.lay_odds ? (a.back_odds / a.lay_odds) : 0;
+                const ratingB = b.back_odds && b.lay_odds ? (b.back_odds / b.lay_odds) : 0;
+                return ratingB - ratingA;
+            });
+            // Compute lay amount for the group (use mainRow)
+            const mainRow = sorted[0];
+            const layAmount = mainRow ? parseFloat(calculateLayAmount(stake, mainRow.back_odds, mainRow.lay_odds, underlay)) : 0;
+            const ql = stake - layAmount;
+            return { participant, sorted, layAmount, ql };
+        });
+
+        // 2. Filter by min QL (show QL >= -minQl)
+        participantGroupArray = participantGroupArray.filter(g => g.ql <= minQl);
+
+        // 3. Sort participant groups by layAmount descending
+        participantGroupArray.sort((a, b) => b.layAmount - a.layAmount);
+
+        // Skip this event if no participants remain after filtering
+        if (participantGroupArray.length === 0) {
+            return;
+        }
+
+        // Only render the event header if there are participants left!
+        const eventTbodyId = `event-tbody-${eventIdx}`;
+        html += `
+            <tbody>
+                <tr class="racing-header cursor-pointer" onclick="toggleEvent('${eventTbodyId}')">
+                    <td colspan="7" class="font-bold px-4 py-4 text-lg border-b border-blue-100 rounded-t">
+                        <span id="icon-${eventTbodyId}" class="mr-2">–</span>
+                        <span class="uppercase tracking-wide">${event_name}</span>
+                        <span class="text-gray-500 text-base ml-2">(${formatEventDate(event_date)})</span>
+                    </td>
+                </tr>
+            </tbody>
+            <tbody id="${eventTbodyId}">
+        `;
+
+        participantGroupArray.forEach(({ participant, sorted }, pIdx) => {
+            const mainRow = sorted[0];
+            const extraRows = sorted.slice(1);
+            const partTbodyId = `event-${eventIdx}-part-${pIdx}`;
+            const rowClass = pIdx % 2 === 0 ? 'racing-row-even' : 'racing-row-odd';
+
+            html += `
+                <tr data-row-id="${mainRow.id}" class="${rowClass} ${highlightRowId === mainRow.id ? 'highlight' : ''} border-b border-gray-200">
+                    <td class="px-4 py-2 font-medium flex items-center">
+                        ${extraRows.length > 0 ? `
+                            <button onclick="toggleParticipant(event, '${partTbodyId}')" class="mr-2 text-xs bg-gray-300 px-2 py-1 rounded flex items-center">
+                                <span id="icon-${partTbodyId}">+</span>
+                            </button>
+                        ` : ''}
+                        <span>${participant}</span>
+                    </td>
+                    <td class="px-4 py-2">${mainRow.back_bookmaker}</td>
+                    <td class="px-4 py-2">${mainRow.back_odds}</td>
+                    <td class="px-4 py-2">${mainRow.lay_bookmaker}</td>
+                    <td class="px-4 py-2">${mainRow.lay_odds}</td>
+                    <td class="px-4 py-2 font-semibold text-right">${computeRating(mainRow)}%</td>
+                    <td class="px-4 py-2">£${calculateLayAmount(stake, mainRow.back_odds, mainRow.lay_odds, underlay)}</td>
+                </tr>
+            `;
+
+            if (extraRows.length > 0) {
+                extraRows.forEach((row, idx) => {
+                    const extraRowClass = (pIdx % 2 === 0 ? 'racing-row-even' : 'racing-row-odd') + ' bg-gray-50';
+                    html += `
+                        <tr data-row-id="${row.id}" class="${extraRowClass} ${highlightRowId === row.id ? 'highlight' : ''} border-b border-gray-100" data-participant="${partTbodyId}" style="display:none;">
+<td class="px-4 py-2 font-medium"></td>
+<td class="px-4 py-2">${row.back_bookmaker}</td>
+<td class="px-4 py-2">${row.back_odds}</td>
+<td class="px-4 py-2">${row.lay_bookmaker}</td>
+<td class="px-4 py-2">${row.lay_odds}</td>
+<td class="px-4 py-2 font-semibold text-right">${computeRating(row)}%</td>
+<td class="px-4 py-2">£${calculateLayAmount(stake, row.back_odds, row.lay_odds, underlay)}</td>
+</tr>
+                    `;
+                });
+            }
+        });
+        html += '</tbody>';
+    });
+    html += `
+    </tbody>
+  </table>
+</div>
+`;
+    document.getElementById('racing-matcher-data').innerHTML = html;
+
+    // Remove highlight after 5 seconds
+    if (highlightRowId) {
+        setTimeout(() => {
+            const el = document.querySelector(`tr[data-row-id="${highlightRowId}"]`);
+            if (el) el.classList.remove('highlight');
+        }, 5000);
+    }
+}
+
+function toggleEvent(tbodyId) {
+    const tbody = document.getElementById(tbodyId);
+    const icon = document.getElementById(`icon-${tbodyId}`);
+    if (tbody.style.display === "none") {
+        tbody.style.display = "";
+        if (icon) icon.textContent = "–";
+    } else {
+        tbody.style.display = "none";
+        if (icon) icon.textContent = "+";
+    }
+}
+
+function toggleParticipant(event, partTbodyId) {
+    event.stopPropagation();
+    const rows = document.querySelectorAll(`tr[data-participant="${partTbodyId}"]`);
+    const icon = document.getElementById(`icon-${partTbodyId}`);
+    let anyHidden = Array.from(rows).some(row => row.style.display === "none" || row.hidden);
+    rows.forEach(row => {
+        row.style.display = anyHidden ? "" : "none";
+    });
+    if (icon) icon.textContent = anyHidden ? "–" : "+";
+}
+
+function handleRealtimeChange(payload) {
+    const { eventType, new: newRow, old: oldRow } = payload;
+    let highlightId = null;
+    if (eventType === "INSERT") {
+        racingRows.push(newRow);
+        highlightId = newRow.id;
+    } else if (eventType === "UPDATE") {
+        racingRows = racingRows.map(row => row.id === newRow.id ? newRow : row);
+        highlightId = newRow.id;
+    } else if (eventType === "DELETE") {
+        racingRows = racingRows.filter(row => row.id !== oldRow.id);
+    }
+    renderRacing(racingRows, highlightId);
+}
+
+let racingRows = [];
+
+(async function() {
+    const ok = await signInWithJwt();
+    if (ok) {
+        fetchAndRenderRacing();
+        console.log("Subscribing to racing realtime changes...");
+        await supabase
+            .channel('racing_changes')
+            .on(
+                'postgres_changes',
+                { event: '*', schema: 'betting_data', table: 'racing' },
+                payload => {
+                    console.log("Realtime payload:", payload);
+                    handleRealtimeChange(payload);
+                }
+            )
+            .subscribe();
+    } else {
+        document.getElementById('racing-matcher-data').innerHTML = `<p class="text-red-600">Authentication failed. Cannot load data.</p>`;
+    }
+})();
+
+document.addEventListener('DOMContentLoaded', function() {
+    // Set remembered stake and min QL on load
+    document.getElementById('default-stake').value = getRememberedStake();
+    document.getElementById('min-ql').value = getRememberedMinQl();
+
+    // Underlay toggle setup
+    const underlayToggle = document.getElementById('underlay-toggle');
+    underlayToggle.checked = getRememberedUnderlay();
+
+    underlayToggle.addEventListener('change', function() {
+        setRememberedUnderlay(this.checked);
+        renderRacing(racingRows);
+    });
+
+    document.getElementById('default-stake').addEventListener('input', function() {
+        setRememberedStake(this.value);
+        renderRacing(racingRows);
+    });
+    document.getElementById('min-ql').addEventListener('input', function() {
+        setRememberedMinQl(this.value);
+        renderRacing(racingRows);
+    });
+});
+</script>
+
+        </div>
+    </main>
+
+
+</body></html>
