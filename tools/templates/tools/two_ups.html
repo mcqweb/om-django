@@ -1,6 +1,27 @@
 {% extends "base.html" %}
 {% block content %}
 <h1 class="text-2xl font-bold mb-4">2Ups Tool</h1>
+
+<div class="flex items-center gap-6 mb-4">
+    <label class="flex items-center gap-2 font-semibold">
+        Default Stake:
+        <span class="text-gray-700">£</span>
+        <input id="default-stake" type="number" min="0" step="0.01" value="10" class="border rounded px-1 py-0.5 w-14 text-sm">
+    </label>
+    <label class="inline-flex items-center cursor-pointer font-semibold">
+      <input id="underlay-toggle" type="checkbox" class="sr-only peer">
+      <div class="relative w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-blue-300 rounded-full peer-checked:bg-blue-600 transition-colors
+        after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all
+        peer-checked:after:translate-x-full peer-checked:after:border-white"></div>
+      <span class="ms-2 text-sm text-gray-900">Underlay</span>
+    </label>
+    <label class="flex items-center gap-2 font-semibold">
+        Min QL:
+        <span class="text-gray-700">£</span>
+        <input id="min-ql" type="number" min="0" step="0.01" value="0" class="border rounded px-1 py-0.5 w-14 text-sm">
+    </label>
+</div>
+
 <div id="two-up-data">
     <div class="text-gray-500">Loading...</div>
 </div>
@@ -12,6 +33,17 @@
 @keyframes highlight-fade {
     0%   { background-color: #fef08a; }
     100% { background-color: inherit; }
+}
+/* Match racing_matcher header and row colors */
+.racing-header {
+    background-color: #e0e7ef !important;
+    color: #334155 !important;
+}
+.racing-row-even {
+    background-color: #f8fafc;
+}
+.racing-row-odd {
+    background-color: #f1f5f9;
 }
 </style>
 <script>
@@ -58,6 +90,15 @@ async function fetchAndRenderTwoUp() {
     renderTwoUp(twoUpRows);
 }
 
+function calculateLayAmount(stake, backOdds, layOdds, underlay) {
+    if (!stake || !backOdds || !layOdds) return '';
+    if (underlay) {
+        return (stake * (backOdds - 1) / (layOdds - 1)).toFixed(2); 
+    } else {
+        return (stake * (backOdds / layOdds)).toFixed(2);
+    }
+}
+
 function renderTwoUp(data, highlightRowId=null) {
     const groups = groupByEvent(data);
     const sortedGroups = Object.entries(groups).sort(
@@ -66,18 +107,35 @@ function renderTwoUp(data, highlightRowId=null) {
     let html = `
 <div class="overflow-x-auto">
   <table class="min-w-full text-sm bg-white border border-gray-300 rounded-lg shadow">
+    <thead>
+      <tr class="racing-header">
+        <th class="px-4 py-2">Participant</th>
+        <th class="px-4 py-2">Back Bookmaker</th>
+        <th class="px-4 py-2">Back Odds</th>
+        <th class="px-4 py-2">Lay Bookmaker</th>
+        <th class="px-4 py-2">Lay Odds</th>
+        <th class="px-4 py-2 text-right">Rating</th>
+        <th class="px-4 py-2 text-right">Lay Amount</th>
+        <th class="px-4 py-2 text-right">QL</th>
+      </tr>
+    </thead>
     <tbody>
 `;
+
+    const stake = parseFloat(document.getElementById('default-stake').value) || 0;
+    const underlay = document.getElementById('underlay-toggle').checked;
+    const minQl = parseFloat(document.getElementById('min-ql').value) || 0;
+
     sortedGroups.forEach(([key, rows], eventIdx) => {
         const [event_name, event_date] = key.split('||');
         const eventTbodyId = `event-tbody-${eventIdx}`;
         html += `
             <tbody>
-                <tr class="bg-blue-600 text-white cursor-pointer" onclick="toggleEvent('${eventTbodyId}')">
-                    <td colspan="6" class="font-bold px-4 py-4 text-lg border-b border-blue-700 rounded-t">
+                <tr class="racing-header cursor-pointer" onclick="toggleEvent('${eventTbodyId}')">
+                    <td colspan="8" class="font-bold px-4 py-4 text-lg border-b border-blue-100 rounded-t">
                         <span id="icon-${eventTbodyId}" class="mr-2">–</span>
                         <span class="uppercase tracking-wide">${event_name}</span>
-                        <span class="text-blue-200 text-base ml-2">(${formatEventDate(event_date)})</span>
+                        <span class="text-gray-500 text-base ml-2">(${formatEventDate(event_date)})</span>
                     </td>
                 </tr>
             </tbody>
@@ -97,9 +155,17 @@ function renderTwoUp(data, highlightRowId=null) {
             const mainRow = sorted[0];
             const extraRows = sorted.slice(1);
             const partTbodyId = `event-${eventIdx}-part-${pIdx}`;
+            const rowClass = pIdx % 2 === 0 ? 'racing-row-even' : 'racing-row-odd';
+
+            // Calculate lay amount and QL
+            const layAmount = parseFloat(calculateLayAmount(stake, mainRow.back_odds, mainRow.lay_odds, underlay));
+            const ql = stake - layAmount;
+
+            // QL filter
+            if (ql > minQl) return;
 
             html += `
-                <tr data-row-id="${mainRow.id}" class="${highlightRowId === mainRow.id ? 'highlight' : ''} border-b border-gray-200">
+                <tr data-row-id="${mainRow.id}" class="${rowClass} ${highlightRowId === mainRow.id ? 'highlight' : ''} border-b border-gray-200">
                     <td class="px-4 py-2 font-medium flex items-center">
                         ${extraRows.length > 0 ? `
                             <button onclick="toggleParticipant(event, '${partTbodyId}')" class="mr-2 text-xs bg-gray-300 px-2 py-1 rounded flex items-center">
@@ -113,20 +179,28 @@ function renderTwoUp(data, highlightRowId=null) {
                     <td class="px-4 py-2">${mainRow.lay_bookmaker}</td>
                     <td class="px-4 py-2">${mainRow.lay_odds}</td>
                     <td class="px-4 py-2 font-semibold text-right">${computeRating(mainRow)}%</td>
+                    <td class="px-4 py-2 text-right">£${layAmount.toFixed(2)}</td>
+                    <td class="px-4 py-2 text-right">£${ql.toFixed(2)}</td>
                 </tr>
             `;
 
             if (extraRows.length > 0) {
                 extraRows.forEach(row => {
+                    const layAmountExtra = parseFloat(calculateLayAmount(stake, row.back_odds, row.lay_odds, underlay));
+                    const qlExtra = stake - layAmountExtra;
+                    if (qlExtra > minQl) return;
+                    const extraRowClass = (pIdx % 2 === 0 ? 'racing-row-even' : 'racing-row-odd') + ' bg-gray-50';
                     html += `
-                        <tr data-row-id="${row.id}" class="${highlightRowId === row.id ? 'highlight' : ''} border-b border-gray-100 bg-gray-50" data-participant="${partTbodyId}" style="display:none;">
-    <td class="px-4 py-2 font-medium"></td>
-    <td class="px-4 py-2">${row.back_bookmaker}</td>
-    <td class="px-4 py-2">${row.back_odds}</td>
-    <td class="px-4 py-2">${row.lay_bookmaker}</td>
-    <td class="px-4 py-2">${row.lay_odds}</td>
-    <td class="px-4 py-2 font-semibold text-right">${computeRating(row)}%</td>
-</tr>
+                        <tr data-row-id="${row.id}" class="${extraRowClass} ${highlightRowId === row.id ? 'highlight' : ''} border-b border-gray-100" data-participant="${partTbodyId}" style="display:none;">
+                            <td class="px-4 py-2 font-medium"></td>
+                            <td class="px-4 py-2">${row.back_bookmaker}</td>
+                            <td class="px-4 py-2">${row.back_odds}</td>
+                            <td class="px-4 py-2">${row.lay_bookmaker}</td>
+                            <td class="px-4 py-2">${row.lay_odds}</td>
+                            <td class="px-4 py-2 font-semibold text-right">${computeRating(row)}%</td>
+                            <td class="px-4 py-2 text-right">£${layAmountExtra.toFixed(2)}</td>
+                            <td class="px-4 py-2 text-right">£${qlExtra.toFixed(2)}</td>
+                        </tr>
                     `;
                 });
             }
@@ -223,5 +297,47 @@ let twoUpRows = [];
         document.getElementById('two-up-data').innerHTML = `<p class="text-red-600">Authentication failed. Cannot load data.</p>`;
     }
 })();
+
+document.addEventListener('DOMContentLoaded', function() {
+    document.getElementById('default-stake').value = getRememberedStake();
+    document.getElementById('min-ql').value = getRememberedMinQl();
+
+    const underlayToggle = document.getElementById('underlay-toggle');
+    underlayToggle.checked = getRememberedUnderlay();
+
+    underlayToggle.addEventListener('change', function() {
+        setRememberedUnderlay(this.checked);
+        renderTwoUp(twoUpRows);
+    });
+
+    document.getElementById('default-stake').addEventListener('input', function() {
+        setRememberedStake(this.value);
+        renderTwoUp(twoUpRows);
+    });
+    document.getElementById('min-ql').addEventListener('input', function() {
+        setRememberedMinQl(this.value);
+        renderTwoUp(twoUpRows);
+    });
+});
+
+// Two Ups-specific remembered settings helpers
+function getRememberedStake() {
+    return localStorage.getItem('two_ups_stake') || 10;
+}
+function setRememberedStake(val) {
+    localStorage.setItem('two_ups_stake', val);
+}
+function getRememberedMinQl() {
+    return localStorage.getItem('two_ups_min_ql') || 0;
+}
+function setRememberedMinQl(val) {
+    localStorage.setItem('two_ups_min_ql', val);
+}
+function getRememberedUnderlay() {
+    return localStorage.getItem('two_ups_underlay') === 'true';
+}
+function setRememberedUnderlay(val) {
+    localStorage.setItem('two_ups_underlay', !!val);
+}
 </script>
 {% endblock %}

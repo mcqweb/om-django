@@ -1,6 +1,5 @@
 Tidy up css 
  - Header
  - 2Ups
-Sort out admin for Quill
-Add Racing Matcher
+Menu doesn't work on ios
 Add Will Hill

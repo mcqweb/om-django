@@ -3,6 +3,7 @@ to deploy
 SSH into server
 cd into folder
 /home/admin/om-django
+source venv/bin/activate
 
 kill any processes on 8000
 sudo lsof -i :8000

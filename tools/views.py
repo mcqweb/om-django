@@ -4,7 +4,7 @@ from django.contrib.auth.decorators import login_required, permission_required
 from .models import UserToolPermission, TwoUp, Event
 from collections import defaultdict
 from django.utils import timezone
-from tools.utils import generate_supabase_jwt
+from tools.utils import generate_supabase_tokens
 from django.conf import settings
 from .supabase_admin import create_supabase_user
 from django.db import transaction
@@ -33,24 +33,26 @@ def two_ups(request):
         grouped[row.event_id].append(row)
     # Sort events by event_date
     sorted_events = sorted(events.values(), key=lambda e: e.event_date)
-    jwt_token = generate_supabase_jwt(request.user)
+    access_token, refresh_token = generate_supabase_tokens(request.user)
     context = {
         "grouped": grouped,
         "events": events,
         "sorted_events": sorted_events,
         "SUPABASE_URL": settings.SUPABASE_URL,
         "SUPABASE_ANON_KEY": settings.SUPABASE_ANON_KEY,
-        "SUPABASE_JWT": jwt_token,
+        "SUPABASE_ACCESS_TOKEN": access_token,
+        "SUPABASE_REFRESH_TOKEN": refresh_token,
     }
     return render(request, "tools/two_ups.html", context)
 
 @login_required
 def racing_matcher(request):
-    jwt_token = generate_supabase_jwt(request.user)
+    access_token, refresh_token = generate_supabase_tokens(request.user)
     context = {
         "SUPABASE_URL": settings.SUPABASE_URL,
         "SUPABASE_ANON_KEY": settings.SUPABASE_ANON_KEY,
-        "SUPABASE_JWT": jwt_token,
+        "SUPABASE_ACCESS_TOKEN": access_token,
+        "SUPABASE_REFRESH_TOKEN": refresh_token,
     }
     return render(request, "tools/racing_matcher.html",context)
 
