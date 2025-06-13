@@ -6,7 +6,7 @@
     <label class="flex items-center gap-2 font-semibold">
         Default Stake:
         <span class="text-gray-700">£</span>
-        <input id="default-stake" type="number" min="0" step="0.01" value="10" class="border rounded px-1 py-0.5 w-14 text-sm">
+        <input id="default-stake" type="number" min="0" step="0.5" value="10" class="border rounded px-1 py-0.5 w-14 text-sm">
     </label>
     <label class="inline-flex items-center cursor-pointer font-semibold">
       <input id="underlay-toggle" type="checkbox" class="sr-only peer">
@@ -18,7 +18,7 @@
     <label class="flex items-center gap-2 font-semibold">
         Min QL:
         <span class="text-gray-700">£</span>
-        <input id="min-ql" type="number" min="0" step="0.01" value="0" class="border rounded px-1 py-0.5 w-14 text-sm">
+        <input id="min-ql" type="number" min="0" step="0.1" value="5" class="border rounded px-1 py-0.5 w-14 text-sm">
     </label>
 </div>
 
@@ -328,7 +328,7 @@ function setRememberedStake(val) {
     localStorage.setItem('two_ups_stake', val);
 }
 function getRememberedMinQl() {
-    return localStorage.getItem('two_ups_min_ql') || 0;
+    return localStorage.getItem('two_ups_min_ql') || 1;
 }
 function setRememberedMinQl(val) {
     localStorage.setItem('two_ups_min_ql', val);
