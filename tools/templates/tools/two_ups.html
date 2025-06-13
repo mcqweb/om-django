@@ -16,9 +16,21 @@
       <span class="ms-2 text-sm text-gray-900">Underlay</span>
     </label>
     <label class="flex items-center gap-2 font-semibold">
-        Min QL:
+        <span id="min-ql-label">Min QL:</span>
         <span class="text-gray-700">£</span>
-        <input id="min-ql" type="number" min="0" step="0.1" value="5" class="border rounded px-1 py-0.5 w-14 text-sm">
+        <span id="min-ql-wrapper">
+            <input id="min-ql" type="number" min="0" step="0.1" value="1" class="border rounded px-1 py-0.5 w-14 text-sm">
+        </span>
+        <span id="min-profit-wrapper" style="display:none;">
+            <input id="min-profit" type="number" min="0" step="0.1" value="1" class="border rounded px-1 py-0.5 w-14 text-sm">
+        </span>
+    </label>
+    <label class="inline-flex items-center cursor-pointer font-semibold">
+      <input id="freebet-toggle" type="checkbox" class="sr-only peer">
+      <div class="relative w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-blue-300 rounded-full peer-checked:bg-blue-600 transition-colors
+        after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all
+        peer-checked:after:translate-x-full peer-checked:after:border-white"></div>
+      <span class="ms-2 text-sm text-gray-900">Free Bet?</span>
     </label>
 </div>
 
@@ -90,13 +102,26 @@ async function fetchAndRenderTwoUp() {
     renderTwoUp(twoUpRows);
 }
 
-function calculateLayAmount(stake, backOdds, layOdds, underlay) {
+function calculateLayAmount(stake, backOdds, layOdds, underlay, freebet) {
     if (!stake || !backOdds || !layOdds) return '';
-    if (underlay) {
-        return (stake * (backOdds - 1) / (layOdds - 1)).toFixed(2); 
-    } else {
-        return (stake * (backOdds / layOdds)).toFixed(2);
+    if (freebet && underlay) {
+        // Free bet underlay formula
+        // Lay = (Stake * (BackOdds - 1)) / (LayOdds - 1)
+        console.log("-------")
+        console.log(stake, backOdds, layOdds, underlay, freebet);
+        return (((stake * (backOdds - 1))-stake) / (layOdds - 1)).toFixed(2);
     }
+    if (freebet) {
+        // Free bet SNR lay amount
+        // Lay = (Stake * BackOdds) / LayOdds
+        return (stake * (backOdds-1) / layOdds).toFixed(2);
+    }
+    if (underlay) {
+        // Normal underlay
+        return (stake * (backOdds - 1) / (layOdds - 1)).toFixed(2); 
+    }
+    // Normal bet
+    return (stake * (backOdds / layOdds)).toFixed(2);
 }
 
 function renderTwoUp(data, highlightRowId=null) {
@@ -104,6 +129,11 @@ function renderTwoUp(data, highlightRowId=null) {
     const sortedGroups = Object.entries(groups).sort(
         ([aKey], [bKey]) => new Date(aKey.split('||')[1]) - new Date(bKey.split('||')[1])
     );
+    const stake = parseFloat(document.getElementById('default-stake').value) || 0;
+    const underlay = document.getElementById('underlay-toggle').checked;
+    const minQl = parseFloat(document.getElementById('min-ql').value) || 0;
+    const minProfit = parseFloat(document.getElementById('min-profit').value) || 0;
+    const freebet = document.getElementById('freebet-toggle').checked;
     let html = `
 <div class="overflow-x-auto">
   <table class="min-w-full text-sm bg-white border border-gray-300 rounded-lg shadow">
@@ -116,15 +146,11 @@ function renderTwoUp(data, highlightRowId=null) {
         <th class="px-4 py-2">Lay Odds</th>
         <th class="px-4 py-2 text-right">Rating</th>
         <th class="px-4 py-2 text-right">Lay Amount</th>
-        <th class="px-4 py-2 text-right">QL</th>
       </tr>
     </thead>
     <tbody>
 `;
 
-    const stake = parseFloat(document.getElementById('default-stake').value) || 0;
-    const underlay = document.getElementById('underlay-toggle').checked;
-    const minQl = parseFloat(document.getElementById('min-ql').value) || 0;
 
     sortedGroups.forEach(([key, rows], eventIdx) => {
         const [event_name, event_date] = key.split('||');
@@ -157,12 +183,20 @@ function renderTwoUp(data, highlightRowId=null) {
             const partTbodyId = `event-${eventIdx}-part-${pIdx}`;
             const rowClass = pIdx % 2 === 0 ? 'racing-row-even' : 'racing-row-odd';
 
-            // Calculate lay amount and QL
-            const layAmount = parseFloat(calculateLayAmount(stake, mainRow.back_odds, mainRow.lay_odds, underlay));
-            const ql = stake - layAmount;
+            // Calculate lay amount and QL/Profit
+            const layAmount = parseFloat(calculateLayAmount(stake, mainRow.back_odds, mainRow.lay_odds, underlay,freebet));
+            let ql;
+            if (freebet) {
+                // Profit for free bet: (layAmount - (stake / (mainRow.lay_odds - 1)))
+                ql = layAmount;
+            } else {
+                // Qualifying loss as before
+                ql = stake - layAmount;
+            }
 
-            // QL filter
-            if (ql > minQl) return;
+            // QL filter (for free bet, filter by profit)
+            if (!freebet && ql > minQl) return;
+            if (freebet && ql < minProfit) return;
 
             html += `
                 <tr data-row-id="${mainRow.id}" class="${rowClass} ${highlightRowId === mainRow.id ? 'highlight' : ''} border-b border-gray-200">
@@ -180,7 +214,6 @@ function renderTwoUp(data, highlightRowId=null) {
                     <td class="px-4 py-2">${mainRow.lay_odds}</td>
                     <td class="px-4 py-2 font-semibold text-right">${computeRating(mainRow)}%</td>
                     <td class="px-4 py-2 text-right">£${layAmount.toFixed(2)}</td>
-                    <td class="px-4 py-2 text-right">£${ql.toFixed(2)}</td>
                 </tr>
             `;
 
@@ -301,6 +334,7 @@ let twoUpRows = [];
 document.addEventListener('DOMContentLoaded', function() {
     document.getElementById('default-stake').value = getRememberedStake();
     document.getElementById('min-ql').value = getRememberedMinQl();
+    document.getElementById('min-profit').value = getRememberedMinProfit();
 
     const underlayToggle = document.getElementById('underlay-toggle');
     underlayToggle.checked = getRememberedUnderlay();
@@ -318,6 +352,20 @@ document.addEventListener('DOMContentLoaded', function() {
         setRememberedMinQl(this.value);
         renderTwoUp(twoUpRows);
     });
+    document.getElementById('min-profit').addEventListener('input', function() {
+        setRememberedMinProfit(this.value);
+        renderTwoUp(twoUpRows);
+    });
+
+    const freebetToggle = document.getElementById('freebet-toggle');
+    freebetToggle.checked = getRememberedFreeBet();
+    updateMinFilterInput();
+
+    freebetToggle.addEventListener('change', function() {
+        setRememberedFreeBet(this.checked);
+        updateMinFilterInput();
+        renderTwoUp(twoUpRows);
+    });
 });
 
 // Two Ups-specific remembered settings helpers
@@ -333,11 +381,30 @@ function getRememberedMinQl() {
 function setRememberedMinQl(val) {
     localStorage.setItem('two_ups_min_ql', val);
 }
+function getRememberedMinProfit() {
+    return localStorage.getItem('two_ups_min_profit') || 1;
+}
+function setRememberedMinProfit(val) {
+    localStorage.setItem('two_ups_min_profit', val);
+}
 function getRememberedUnderlay() {
     return localStorage.getItem('two_ups_underlay') === 'true';
 }
 function setRememberedUnderlay(val) {
     localStorage.setItem('two_ups_underlay', !!val);
+}
+function getRememberedFreeBet() {
+    return localStorage.getItem('two_ups_freebet') === 'true';
+}
+function setRememberedFreeBet(val) {
+    localStorage.setItem('two_ups_freebet', !!val);
+}
+
+function updateMinFilterInput() {
+    const freebet = document.getElementById('freebet-toggle').checked;
+    document.getElementById('min-ql-wrapper').style.display = freebet ? 'none' : '';
+    document.getElementById('min-profit-wrapper').style.display = freebet ? '' : 'none';
+    document.getElementById('min-ql-label').textContent = freebet ? 'Min Profit:' : 'Min QL:';
 }
 </script>
 {% endblock %}
