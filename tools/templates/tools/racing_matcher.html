@@ -16,9 +16,21 @@
       <span class="ms-2 text-sm text-gray-900">Underlay</span>
     </label>
     <label class="flex items-center gap-2 font-semibold">
-        Min QL:
+        <span id="min-ql-label">Min QL:</span>
         <span class="text-gray-700">£</span>
-        <input id="min-ql" type="number" min="0" step="0.1" value="1" class="border rounded px-1 py-0.5 w-14 text-sm">
+        <span id="min-ql-wrapper">
+            <input id="min-ql" type="number" min="0" step="0.1" value="1" class="border rounded px-1 py-0.5 w-14 text-sm">
+        </span>
+        <span id="min-profit-wrapper" style="display:none;">
+            <input id="min-profit" type="number" min="0" step="0.1" value="1" class="border rounded px-1 py-0.5 w-14 text-sm">
+        </span>
+    </label>
+    <label class="inline-flex items-center cursor-pointer font-semibold">
+      <input id="freebet-toggle" type="checkbox" class="sr-only peer">
+      <div class="relative w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-blue-300 rounded-full peer-checked:bg-blue-600 transition-colors
+        after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all
+        peer-checked:after:translate-x-full peer-checked:after:border-white"></div>
+      <span class="ms-2 text-sm text-gray-900">Free Bet?</span>
     </label>
 </div>
 
@@ -67,13 +79,26 @@ function computeRating(row) {
     return ((row.back_odds / row.lay_odds) * 100).toFixed(1);
 }
 
-function calculateLayAmount(stake, backOdds, layOdds, underlay) {
+function calculateLayAmount(stake, backOdds, layOdds, underlay, freebet) {
     if (!stake || !backOdds || !layOdds) return '';
-    if (underlay) {
-        return (stake * (backOdds - 1) / (layOdds - 1)).toFixed(2); 
-    } else {
-        return (stake * (backOdds / layOdds)).toFixed(2);
+    if (freebet && underlay) {
+        // Free bet underlay formula
+        // Lay = (Stake * (BackOdds - 1)) / (LayOdds - 1)
+        console.log("-------")
+        console.log(stake, backOdds, layOdds, underlay, freebet);
+        return (((stake * (backOdds - 1))-stake) / (layOdds - 1)).toFixed(2);
     }
+    if (freebet) {
+        // Free bet SNR lay amount
+        // Lay = (Stake * BackOdds) / LayOdds
+        return (stake * (backOdds-1) / layOdds).toFixed(2);
+    }
+    if (underlay) {
+        // Normal underlay
+        return (stake * (backOdds - 1) / (layOdds - 1)).toFixed(2); 
+    }
+    // Normal bet
+    return (stake * (backOdds / layOdds)).toFixed(2);
 }
 
 function groupByEvent(data) {
@@ -102,10 +127,23 @@ function setRememberedUnderlay(val) {
 
 // Remember min QL between reloads
 function getRememberedMinQl() {
-    return localStorage.getItem('minQl') || "1";
+    return localStorage.getItem('racing_min_ql') || 1;
 }
 function setRememberedMinQl(val) {
-    localStorage.setItem('minQl', val);
+    localStorage.setItem('racing_min_ql', val);
+}
+function getRememberedMinProfit() {
+    return localStorage.getItem('racing_min_profit') || 1;
+}
+function setRememberedMinProfit(val) {
+    localStorage.setItem('racing_min_profit', val);
+}
+
+function getRememberedFreeBet() {
+    return localStorage.getItem('racing_freebet') === 'true';
+}
+function setRememberedFreeBet(val) {
+    localStorage.setItem('racing_freebet', !!val);
 }
 
 async function fetchAndRenderRacing() {
@@ -133,6 +171,8 @@ function renderRacing(data, highlightRowId=null) {
     <tbody>
 `;
     const minQl = parseFloat(document.getElementById('min-ql').value) || 0;
+const minProfit = parseFloat(document.getElementById('min-profit').value) || 0;
+const freebet = document.getElementById('freebet-toggle').checked;
 
     sortedGroups.forEach(([key, rows], eventIdx) => {
         const [event_name, event_date] = key.split('||');
@@ -156,13 +196,22 @@ function renderRacing(data, highlightRowId=null) {
             });
             // Compute lay amount for the group (use mainRow)
             const mainRow = sorted[0];
-            const layAmount = mainRow ? parseFloat(calculateLayAmount(stake, mainRow.back_odds, mainRow.lay_odds, underlay)) : 0;
-            const ql = stake - layAmount;
+            const layAmount = mainRow ? parseFloat(
+    freebet
+        ? (stake * mainRow.back_odds / mainRow.lay_odds)
+        : calculateLayAmount(stake, mainRow.back_odds, mainRow.lay_odds, underlay, freebet)
+) : 0;
+
+const ql = freebet
+    ? layAmount - (stake / (mainRow.lay_odds - 1))
+    : stake - layAmount;
             return { participant, sorted, layAmount, ql };
         });
 
         // 2. Filter by min QL (show QL >= -minQl)
-        participantGroupArray = participantGroupArray.filter(g => g.ql <= minQl);
+        participantGroupArray = participantGroupArray.filter(g =>
+    freebet ? g.ql >= minProfit : g.ql <= minQl
+);
 
         // 3. Sort participant groups by layAmount descending
         participantGroupArray.sort((a, b) => b.layAmount - a.layAmount);
@@ -208,7 +257,7 @@ function renderRacing(data, highlightRowId=null) {
                     <td class="px-4 py-2">${mainRow.lay_bookmaker}</td>
                     <td class="px-4 py-2">${mainRow.lay_odds}</td>
                     <td class="px-4 py-2 font-semibold text-right">${computeRating(mainRow)}%</td>
-                    <td class="px-4 py-2">£${calculateLayAmount(stake, mainRow.back_odds, mainRow.lay_odds, underlay)}</td>
+                    <td class="px-4 py-2">£${calculateLayAmount(stake, mainRow.back_odds, mainRow.lay_odds, underlay,freebet)}</td>
                 </tr>
             `;
 
@@ -223,7 +272,7 @@ function renderRacing(data, highlightRowId=null) {
 <td class="px-4 py-2">${row.lay_bookmaker}</td>
 <td class="px-4 py-2">${row.lay_odds}</td>
 <td class="px-4 py-2 font-semibold text-right">${computeRating(row)}%</td>
-<td class="px-4 py-2">£${calculateLayAmount(stake, row.back_odds, row.lay_odds, underlay)}</td>
+<td class="px-4 py-2">£${calculateLayAmount(stake, row.back_odds, row.lay_odds, underlay,freebet)}</td>
 </tr>
                     `;
                 });
@@ -312,6 +361,7 @@ document.addEventListener('DOMContentLoaded', function() {
     // Set remembered stake and min QL on load
     document.getElementById('default-stake').value = getRememberedStake();
     document.getElementById('min-ql').value = getRememberedMinQl();
+    document.getElementById('min-profit').value = getRememberedMinProfit();
 
     // Underlay toggle setup
     const underlayToggle = document.getElementById('underlay-toggle');
@@ -330,6 +380,28 @@ document.addEventListener('DOMContentLoaded', function() {
         setRememberedMinQl(this.value);
         renderRacing(racingRows);
     });
+    document.getElementById('min-profit').addEventListener('input', function() {
+        setRememberedMinProfit(this.value);
+        renderRacing(racingRows);
+    });
+
+    const freebetToggle = document.getElementById('freebet-toggle');
+    freebetToggle.checked = getRememberedFreeBet();
+    updateMinFilterInput();
+
+    freebetToggle.addEventListener('change', function() {
+        setRememberedFreeBet(this.checked);
+        updateMinFilterInput();
+        renderRacing(racingRows);
+    });
+    updateMinQlLabel();
 });
+
+function updateMinFilterInput() {
+    const freebet = document.getElementById('freebet-toggle').checked;
+    document.getElementById('min-ql-wrapper').style.display = freebet ? 'none' : '';
+    document.getElementById('min-profit-wrapper').style.display = freebet ? '' : 'none';
+    document.getElementById('min-ql-label').textContent = freebet ? 'Min Profit:' : 'Min QL:';
+}
 </script>
 {% endblock %}
