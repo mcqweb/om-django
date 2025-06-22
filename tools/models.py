@@ -23,17 +23,8 @@ class UserToolPermission(models.Model):
     def __str__(self):
         return f"{self.user.username} - {self.tool.name}"
 
-class Event(models.Model):
-    id = models.UUIDField(primary_key=True)
-    name = models.TextField()
-    event_date = models.DateTimeField()
-
-    class Meta:
-        db_table = 'betting_data"."events'
-        managed = False
-
 class TwoUp(models.Model):
-    event = models.ForeignKey(Event, db_column='event_id', on_delete=models.DO_NOTHING)
+    event = models.ForeignKey('betting_data.Event', db_column='event_id', on_delete=models.DO_NOTHING)
     market_id = models.UUIDField()
     market_name = models.TextField()
     participant_id = models.UUIDField()

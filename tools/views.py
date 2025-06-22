@@ -1,13 +1,14 @@
 from django.contrib.auth.models import User
 from django.shortcuts import render, redirect
 from django.contrib.auth.decorators import login_required, permission_required
-from .models import UserToolPermission, TwoUp, Event
+from .models import UserToolPermission, TwoUp
 from collections import defaultdict
 from django.utils import timezone
 from tools.utils import generate_supabase_tokens
 from django.conf import settings
 from .supabase_admin import create_supabase_user
 from django.db import transaction
+from betting_data.models import Event
 
 def landing(request):
     tools = []
